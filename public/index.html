@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能防务检测系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #333;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+      background-color: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .logo {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .action-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      background-color: #4285f4;
+      color: white;
+      cursor: pointer;
+    }
+    
+    .app-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    .sidebar {
+      width: 250px;
+      overflow-y: auto;
+      border-right: 1px solid #e0e0e0;
+    }
+    
+    .main-content {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .results-panel {
+      width: 250px;
+      overflow-y: auto;
+      border-left: 1px solid #e0e0e0;
+    }
+    
+    .app-footer {
+      padding: 10px 20px;
+      background-color: #f5f5f5;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .status-info {
+      display: flex;
+      justify-content: space-around;
+    }
+    
+    .status-item {
+      display: flex;
+      align-items: center;
+    }
+    
+    .label {
+      margin-right: 5px;
+      color: #666;
+    }
+    
+    .value {
+      font-weight: bold;
+    }
+    
+    /* 标签页样式 */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    
+    .tab.active {
+      font-weight: bold;
+      border-bottom: 2px solid #4285f4;
+    }
+    
+    /* 记录列表样式 */
+    .record-item {
+      display: flex;
+      padding: 10px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+    }
+    
+    .record-item:hover {
+      background-color: #f9f9f9;
+    }
+    
+    .record-item.active {
+      background-color: #e8f0fe;
+    }
+    
+    .checkbox {
+      display: flex;
+      align-items: center;
+      margin-right: 10px;
+    }
+    
+    .record-info {
+      flex: 1;
+    }
+    
+    .record-id {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .record-time {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .record-status {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 10px;
+    }
+    
+    .record-status.qualified {
+      background-color: #e6f4ea;
+      color: #137333;
+    }
+    
+    .record-status.defect {
+      background-color: #fce8e6;
+      color: #c5221f;
+    }
+    
+    .record-status.pending {
+      background-color: #e8eaed;
+      color: #5f6368;
+    }
+    
+    /* 图片查看器样式 */
+    .image-container {
+      flex: 1;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f0f0f0;
+      overflow: hidden;
+    }
+    
+    .image-container img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+      gap: 10px;
+      background-color: #f5f5f5;
+    }
+    
+    .controls button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    .detection-btn {
+      background-color: #4285f4;
+      color: white;
+    }
+    
+    .export-btn {
+      background-color: #34a853;
+      color: white;
+    }
+    
+    /* 检测标记样式 */
+    .detection-marker {
+      position: absolute;
+      border: 2px solid red;
+      background-color: rgba(255, 0, 0, 0.2);
+      width: 50px;
+      height: 50px;
+    }
+    
+    /* 检测结果面板样式 */
+    .results-header {
+      padding: 10px 15px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .results-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: #333;
+    }
+    
+    .results-content {
+      padding: 10px;
+    }
+    
+    .result-item {
+      display: flex;
+      padding: 10px;
+      border-bottom: 1px solid #f0f0f0;
+      align-items: center;
+    }
+    
+    .result-icon {
+      margin-right: 10px;
+      width: 24px;
+      height: 24px;
+      background-color: #fce8e6;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #c5221f;
+    }
+    
+    .result-info {
+      flex: 1;
+    }
+    
+    .result-type {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .result-confidence {
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="logo">智能防务检测系统</div>
+    <div class="actions">
+      <button class="action-btn">开始</button>
+      <button class="action-btn">合格</button>
+      <button class="action-btn">缺陷</button>
+    </div>
+  </header>
+  
+  <main class="app-content">
+    <div class="sidebar">
+      <div class="tabs">
+        <div class="tab active">全部</div>
+        <div class="tab">合格</div>
+        <div class="tab">缺陷</div>
+      </div>
+      <div id="record-list">
+        <div class="record-item active">
+          <div class="checkbox">
+            <input type="checkbox" id="check-001">
+          </div>
+          <div class="record-info">
+            <div class="record-id">001</div>
+            <div class="record-time">检测时间：07/13 14:25</div>
+            <div class="record-status qualified">合格</div>
+          </div>
+        </div>
+        <div class="record-item">
+          <div class="checkbox">
+            <input type="checkbox" id="check-002">
+          </div>
+          <div class="record-info">
+            <div class="record-id">002</div>
+            <div class="record-time">检测时间：07/13 14:25</div>
+            <div class="record-status defect">缺陷</div>
+          </div>
+        </div>
+        <div class="record-item">
+          <div class="checkbox">
+            <input type="checkbox" id="check-003">
+          </div>
+          <div class="record-info">
+            <div class="record-id">003</div>
+            <div class="record-time">检测时间：07/13 14:25</div>
+            <div class="record-status pending">待检</div>
+          </div>
+        </div>
+        <!-- 更多记录项 -->
+        <div class="record-item">
+          <div class="checkbox">
+            <input type="checkbox" id="check-004">
+          </div>
+          <div class="record-info">
+            <div class="record-id">004</div>
+            <div class="record-time">检测时间：07/13 14:15</div>
+            <div class="record-status qualified">合格</div>
+          </div>
+        </div>
+        <div class="record-item">
+          <div class="checkbox">
+            <input type="checkbox" id="check-005">
+          </div>
+          <div class="record-info">
+            <div class="record-id">005</div>
+            <div class="record-time">检测时间：07/13 14:15</div>
+            <div class="record-status qualified">合格</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="main-content">
+      <div class="image-container">
+        <img src="/hinge-example.jpg" alt="检测图片">
+        <div class="detection-marker" style="top: 150px; left: 200px;"></div>
+        <div class="detection-marker" style="top: 150px; left: 350px;"></div>
+        <div class="detection-marker" style="top: 250px; left: 275px;"></div>
+      </div>
+      <div class="controls">
+        <button class="detection-btn">检测结果</button>
+        <button class="export-btn">导出报告</button>
+      </div>
+    </div>
+    
+    <div class="results-panel">
+      <div class="results-header">
+        <h3>检测结果</h3>
+      </div>
+      <div class="results-content">
+        <div class="result-item">
+          <div class="result-icon">!</div>
+          <div class="result-info">
+            <div class="result-type">缺陷类型: 裂缝</div>
+            <div class="result-confidence">置信度: 92.5%</div>
+          </div>
+        </div>
+        <div class="result-item">
+          <div class="result-icon">!</div>
+          <div class="result-info">
+            <div class="result-type">缺陷类型: 磨损</div>
+            <div class="result-confidence">置信度: 87.3%</div>
+          </div>
+        </div>
+        <div class="result-item">
+          <div class="result-icon">!</div>
+          <div class="result-info">
+            <div class="result-type">缺陷类型: 变形</div>
+            <div class="result-confidence">置信度: 95.1%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <footer class="app-footer">
+    <div class="status-info">
+      <div class="status-item">
+        <span class="label">当前状态:</span>
+        <span class="value">已连接</span>
+      </div>
+      <div class="status-item">
+        <span class="label">检测结果:</span>
+        <span class="value">3</span>
+      </div>
+      <div class="status-item">
+        <span class="label">缺陷数量:</span>
+        <span class="value">20</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // 简单的交互逻辑
+    document.addEventListener('DOMContentLoaded', function() {
+      // 标签页切换
+      const tabs = document.querySelectorAll('.tab');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          tabs.forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+      
+      // 记录项选择
+      const recordItems = document.querySelectorAll('.record-item');
+      recordItems.forEach(item => {
+        item.addEventListener('click', function() {
+          recordItems.forEach(i => i.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+      
+      // 检测按钮点击
+      const detectionBtn = document.querySelector('.detection-btn');
+      detectionBtn.addEventListener('click', function() {
+        alert('正在进行检测...');
+      });
+      
+      // 导出报告按钮点击
+      const exportBtn = document.querySelector('.export-btn');
+      exportBtn.addEventListener('click', function() {
+        alert('正在导出报告...');
+      });
+    });
+  </script>
+</body>
+</html>
