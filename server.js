@@ -36,6 +36,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 健康检查路由
+app.get('/ping', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
+
 // 上传图片API
 app.post('/api/upload', upload.single('image'), (req, res) => {
   if (!req.file) {
