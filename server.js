@@ -15,7 +15,13 @@ const storage = multer.diskStorage({
     cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
+    // 使用请求中的自定义文件名或默认使用时间戳
+    const customFilename = req.query.filename;
+    if (customFilename) {
+      cb(null, customFilename);
+    } else {
+      cb(null, Date.now() + path.extname(file.originalname));
+    }
   }
 });
 const upload = multer({ storage: storage });
