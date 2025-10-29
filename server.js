@@ -112,24 +112,8 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
   });
 });
 
-// 获取图片列表API
-app.get('/api/images', (req, res) => {
-  fs.readdir('uploads', (err, files) => {
-    if (err) {
-      return res.status(500).json({ error: '无法读取图片目录' });
-    }
-    
-    const images = files
-      .filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file))
-      .map(file => ({
-        name: file,
-        path: `/uploads/${file}`,
-        url: `http://${ip.address()}:${port}/uploads/${file}`
-      }));
-    
-    res.json(images);
-  });
-});
+// 这里删除了重复的/api/images接口定义
+// 上面已经定义了更完善的/api/images接口
 
 // 检测API（模拟）
 app.post('/api/detect', (req, res) => {
