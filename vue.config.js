@@ -6,6 +6,19 @@ module.exports = defineConfig({
   devServer: {
     port: 8080
   },
+  // 配置Node.js核心模块的polyfill
+  configureWebpack: {
+    resolve: {
+      fallback: {
+        path: false,
+        fs: false,
+        crypto: false,
+        stream: false,
+        os: false,
+        util: false
+      }
+    }
+  },
   // 配置Electron构建
   pluginOptions: {
     electronBuilder: {

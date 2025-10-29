@@ -7,7 +7,7 @@ const fs = require('fs');
 const ip = require('ip');
 
 const app = express();
-const port = 8080;
+const port = 3000;
 
 // 配置存储
 const storage = multer.diskStorage({

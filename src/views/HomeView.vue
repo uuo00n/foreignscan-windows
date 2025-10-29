@@ -66,9 +66,9 @@ export default {
       { id: '005', time: '07/13 14:15', status: 'qualified', selected: false },
       { id: '006', time: '07/13 14:15', status: 'qualified', selected: false },
       { id: '007', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '008', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '009', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '010', time: '07/13 14:15', status: 'qualified', selected: false }
+      { id: '008', time: '07/13 14:15', status: 'undetected', selected: false },
+      { id: '009', time: '07/13 14:15', status: 'undetected', selected: false },
+      { id: '010', time: '07/13 14:15', status: 'undetected', selected: false }
     ];
     this.loadInspectionRecords(mockRecords);
   }

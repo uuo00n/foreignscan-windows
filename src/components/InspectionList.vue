@@ -4,6 +4,7 @@
       <div class="tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">全部</div>
       <div class="tab" :class="{ active: activeTab === 'qualified' }" @click="activeTab = 'qualified'">合格</div>
       <div class="tab" :class="{ active: activeTab === 'defect' }" @click="activeTab = 'defect'">缺陷</div>
+      <div class="tab" :class="{ active: activeTab === 'undetected' }" @click="activeTab = 'undetected'">未检测</div>
     </div>
     <div class="list-container">
       <div 
@@ -46,9 +47,12 @@ export default {
         return this.inspectionRecords;
       } else if (this.activeTab === 'qualified') {
         return this.inspectionRecords.filter(record => record.status === 'qualified');
-      } else {
+      } else if (this.activeTab === 'defect') {
         return this.inspectionRecords.filter(record => record.status === 'defect');
+      } else if (this.activeTab === 'undetected') {
+        return this.inspectionRecords.filter(record => record.status === 'undetected');
       }
+      return this.inspectionRecords;
     }
   },
   methods: {
@@ -61,6 +65,7 @@ export default {
         case 'qualified': return '合格';
         case 'defect': return '缺陷';
         case 'pending': return '待检';
+        case 'undetected': return '未检测';
         default: return '未知';
       }
     }

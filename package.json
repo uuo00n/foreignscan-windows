@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
     "electron:serve": "electron .",
     "electron:build": "electron-builder",
     "postinstall": "electron-builder install-app-deps"
@@ -24,6 +26,7 @@
     "vuex": "^4.1.0"
   },
   "devDependencies": {
+    "@vue/cli-service": "^5.0.9",
     "electron": "^16.2.8",
     "electron-builder": "^23.0.0",
     "nodemon": "^2.0.20",
