@@ -23,6 +23,9 @@
           <div class="record-status" :class="record.status">{{ getStatusText(record.status) }}</div>
         </div>
       </div>
+      <div class="no-data" v-if="filteredRecords.length === 0">
+        <p>暂无数据</p>
+      </div>
     </div>
     <div class="action-buttons">
       <button class="export-btn">导出报告</button>
@@ -56,7 +59,7 @@ export default {
     }
   },
   methods: {
-    ...mapActions(['setCurrentRecord']),
+    ...mapActions(['setCurrentRecord', 'fetchImagesFromServer']),
     selectRecord(record) {
       this.setCurrentRecord(record);
     },
@@ -68,9 +71,15 @@ export default {
         case 'undetected': return '未检测';
         default: return '未知';
       }
+    },
+    async loadImages() {
+      await this.fetchImagesFromServer();
     }
   },
-  mounted() {
+  async mounted() {
+    // 从服务器加载图片数据
+    await this.loadImages();
+    
     // 如果有记录但没有选中的记录，默认选中第一个
     if (this.inspectionRecords.length > 0 && !this.currentRecord) {
       this.selectRecord(this.inspectionRecords[0]);
@@ -166,6 +175,16 @@ export default {
 .record-status.pending {
   background-color: #e8eaed;
   color: #5f6368;
+}
+
+.no-data {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  color: #999;
+  font-size: 14px;
+  text-align: center;
 }
 
 .action-buttons {

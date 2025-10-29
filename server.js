@@ -36,6 +36,7 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/uploads', express.static('uploads')); // 提供上传目录的静态访问
 
 // 路由
 app.get('/', (req, res) => {
@@ -45,6 +46,44 @@ app.get('/', (req, res) => {
 // 健康检查路由
 app.get('/ping', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
+
+// 获取图片列表API
+app.get('/api/images', (req, res) => {
+  try {
+    const uploadsDir = path.join(__dirname, 'uploads');
+    const files = fs.readdirSync(uploadsDir);
+    
+    // 过滤出图片文件
+    const imageFiles = files.filter(file => {
+      const ext = path.extname(file).toLowerCase();
+      return ['.jpg', '.jpeg', '.png', '.gif'].includes(ext);
+    });
+    
+    // 构建图片数据
+    const images = imageFiles.map((file, index) => {
+      // 从文件名中提取日期和ID信息
+      const fileNameWithoutExt = path.basename(file, path.extname(file));
+      const parts = fileNameWithoutExt.split('_');
+      const date = parts[0] || '';
+      const id = parts[1] || '';
+      
+      // 创建图片对象
+      return {
+        id: id || String(index + 1).padStart(3, '0'),
+        filename: file,
+        path: `/uploads/${file}`,
+        date: date,
+        time: new Date().toLocaleTimeString(),
+        status: 'undetected' // 默认设置为未检测状态
+      };
+    });
+    
+    res.json({ success: true, images });
+  } catch (error) {
+    console.error('Error getting images:', error);
+    res.status(500).json({ success: false, message: 'Failed to get images' });
+  }
 });
 
 // 上传图片API
