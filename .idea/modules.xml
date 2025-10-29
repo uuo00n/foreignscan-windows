@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/foreignscan-back.iml" filepath="$PROJECT_DIR$/.idea/foreignscan-back.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/foreignscan-process.iml" filepath="$PROJECT_DIR$/.idea/foreignscan-process.iml" />
     </modules>
   </component>
 </project>
