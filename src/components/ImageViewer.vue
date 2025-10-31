@@ -2,6 +2,7 @@
   <div class="image-viewer">
     <div class="image-container">
       <img :src="imageSrc" alt="检测图片" v-if="imageSrc" />
+      <div class="backend-error" v-else-if="hasBackendError">后端异常，无法获取图片</div>
       <div class="no-image" v-else>请选择一个检测记录查看图片</div>
       <div class="detection-markers" v-if="detectionResults.length > 0">
         <div 
@@ -18,8 +19,8 @@
       </div>
     </div>
     <div class="controls">
-      <button class="detection-btn" @click="runDetection">检测结果</button>
-      <button class="export-btn">导出报告</button>
+      <button class="detection-btn" @click="runDetection" :disabled="!imageSrc || hasBackendError">检测结果</button>
+      <button class="export-btn" :disabled="!imageSrc || hasBackendError">导出报告</button>
     </div>
   </div>
 </template>
@@ -34,33 +35,71 @@ const ipcRenderer = electron ? electron.ipcRenderer : null;
 export default {
   name: 'ImageViewer',
   computed: {
-    ...mapState(['currentImage', 'detectionResults']),
+    ...mapState(['currentImage', 'detectionResults', 'backendStatus']),
     imageSrc() {
+      // 如果没有选中记录，返回null
       if (!this.currentImage) return null;
-      // 在实际应用中，这里应该是从服务器或本地文件系统获取图片
-      return this.currentImage.path || require('@/assets/hinge-example.jpg');
+      
+      // 如果有服务器图片路径，优先使用
+      if (this.currentImage.path) {
+        // 确保路径正确
+        console.log('使用服务器图片路径:', this.currentImage.path);
+        return this.currentImage.path;
+      } else {
+        // 如果没有服务器图片路径或path为null，使用本地示例图片
+        console.log('使用本地示例图片');
+        return require('@/assets/hinge-example.jpg');
+      }
+    },
+    hasBackendError() {
+      return this.backendStatus === 'error';
     }
   },
   methods: {
     ...mapActions(['setDetectionResults']),
-    runDetection() {
-      // 模拟检测过程
-      const mockResults = [
-        { x: 200, y: 150, width: 50, height: 50, type: 'defect', confidence: 0.92 },
-        { x: 350, y: 150, width: 50, height: 50, type: 'defect', confidence: 0.87 },
-        { x: 275, y: 250, width: 50, height: 50, type: 'defect', confidence: 0.95 }
-      ];
+    async runDetection() {
+      if (!this.currentImage || !this.currentImage.id) {
+        return;
+      }
       
-      // 在实际应用中，这里应该调用后端API进行检测
-      setTimeout(() => {
-        this.setDetectionResults(mockResults);
-      }, 500);
-      
-      // 也可以通过IPC与主进程通信
-      // ipcRenderer.invoke('run-detection', this.currentImage.id)
-      //   .then(results => {
-      //     this.setDetectionResults(results);
-      //   });
+      try {
+        // 通过IPC与主进程通信，调用后端API进行检测
+        if (ipcRenderer) {
+          // 使用正确的API格式
+          const results = await ipcRenderer.invoke('run-detection', {
+            imageId: this.currentImage.id
+          });
+          this.setDetectionResults(results || []);
+        } else {
+          // 浏览器环境下，直接调用API
+          try {
+            // 使用POST方法和正确的API路径
+            const response = await fetch('http://localhost:3000/api/detect', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                imageId: this.currentImage.id
+              })
+            });
+            
+            const data = await response.json();
+            if (response.ok && data.results) {
+              this.setDetectionResults(data.results || []);
+            } else {
+              this.setDetectionResults([]);
+              console.error('检测失败:', data.message || '未知错误');
+            }
+          } catch (error) {
+            this.setDetectionResults([]);
+            console.error('检测请求失败:', error);
+          }
+        }
+      } catch (error) {
+        this.setDetectionResults([]);
+        console.error('检测过程出错:', error);
+      }
     }
   }
 }

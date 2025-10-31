@@ -6,7 +6,14 @@
       <div class="tab" :class="{ active: activeTab === 'defect' }" @click="activeTab = 'defect'">缺陷</div>
       <div class="tab" :class="{ active: activeTab === 'undetected' }" @click="activeTab = 'undetected'">未检测</div>
     </div>
-    <div class="list-container">
+    
+    <!-- 后端异常提示 -->
+    <div class="backend-error" v-if="hasBackendError">
+      <p>{{ backendError || '后端异常，请检查后端服务是否正常运行' }}</p>
+      <button @click="retryConnection" class="retry-btn">重试连接</button>
+    </div>
+    
+    <div class="list-container" v-else>
       <div 
         v-for="record in filteredRecords" 
         :key="record.id" 
@@ -27,8 +34,9 @@
         <p>暂无数据</p>
       </div>
     </div>
+    
     <div class="action-buttons">
-      <button class="export-btn">导出报告</button>
+      <button class="export-btn" :disabled="filteredRecords.length === 0 || hasBackendError">导出报告</button>
     </div>
   </div>
 </template>
@@ -44,7 +52,10 @@ export default {
     };
   },
   computed: {
-    ...mapState(['inspectionRecords', 'currentRecord']),
+    ...mapState(['inspectionRecords', 'currentRecord', 'backendStatus', 'backendError']),
+    hasBackendError() {
+      return this.backendStatus === 'error';
+    },
     filteredRecords() {
       if (this.activeTab === 'all') {
         return this.inspectionRecords;
@@ -62,6 +73,9 @@ export default {
     ...mapActions(['setCurrentRecord', 'fetchImagesFromServer']),
     selectRecord(record) {
       this.setCurrentRecord(record);
+    },
+    async retryConnection() {
+      await this.fetchImagesFromServer();
     },
     getStatusText(status) {
       switch(status) {

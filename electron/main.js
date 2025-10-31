@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const fetch = require('node-fetch');
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // 保持对window对象的全局引用，避免JavaScript对象被垃圾回收时，窗口被自动关闭
@@ -56,22 +57,50 @@ app.on('activate', () => {
 });
 
 // 处理IPC通信
-ipcMain.on('get-images', (event) => {
-  const uploadsDir = path.join(__dirname, '../uploads');
-  
+// 健康检查
+ipcMain.handle('check-health', async () => {
   try {
-    const files = fs.readdirSync(uploadsDir);
-    const images = files.map(filename => {
-      return {
-        filename,
-        path: path.join(uploadsDir, filename),
-        url: `file://${path.join(uploadsDir, filename)}`
-      };
+    const response = await fetch('http://localhost:3000/ping');
+    return response.ok;
+  } catch (error) {
+    console.error('健康检查失败:', error);
+    return false;
+  }
+});
+
+// 获取图片列表
+ipcMain.handle('get-images', async () => {
+  try {
+    const response = await fetch('http://localhost:3000/api/images');
+    if (response.ok) {
+      const data = await response.json();
+      return data.images || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('获取图片列表失败:', error);
+    return [];
+  }
+});
+
+// 图片检测
+ipcMain.handle('run-detection', async (event, { imageId }) => {
+  try {
+    const response = await fetch('http://localhost:3000/api/detect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ imageId })
     });
     
-    event.reply('images-list', images);
+    if (response.ok) {
+      const data = await response.json();
+      return data.results || [];
+    }
+    return [];
   } catch (error) {
-    console.error('获取图片列表时出错:', error);
-    event.reply('images-list', []);
+    console.error('图片检测失败:', error);
+    return [];
   }
 });
