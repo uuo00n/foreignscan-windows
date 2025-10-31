@@ -18,8 +18,8 @@
           <input type="checkbox" :id="'check-' + record.id" v-model="record.selected">
         </div>
         <div class="record-info">
-          <div class="record-id">{{ record.id }}</div>
-          <div class="record-time">检测时间：{{ record.time }}</div>
+          <div class="record-id">{{ formatDisplayId(record) }}</div>
+          <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
           <div class="record-status" :class="record.status">{{ getStatusText(record.status) }}</div>
         </div>
       </div>
@@ -71,6 +71,30 @@ export default {
         case 'undetected': return '未检测';
         default: return '未知';
       }
+    },
+    formatDisplayId(record) {
+      // 如果没有timestamp或sceneId，则使用原始id
+      if (!record.timestamp && !record.sceneId) {
+        return record.id || '未知ID';
+      }
+      
+      // 格式化日期和时间
+      const date = this.formatDate(record.timestamp);
+      const time = this.formatTime(record.timestamp);
+      const sceneId = record.sceneId || '未知场景';
+      
+      // 返回格式化后的显示文本：日期-时间-场景id
+      return `${date}-${time}-${sceneId}`;
+    },
+    formatDate(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+    },
+    formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
     },
     async loadImages() {
       await this.fetchImagesFromServer();
