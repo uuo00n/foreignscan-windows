@@ -62,7 +62,6 @@
 import InspectionList from '@/components/InspectionList.vue';
 import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
-import { mapActions } from 'vuex';
 // 引入 TDesign 图标库中的日历图标
 import { CalendarIcon } from 'tdesign-icons-vue-next';
 
@@ -75,29 +74,13 @@ export default {
     CalendarIcon
   },
   methods: {
-    ...mapActions(['loadInspectionRecords']),
     // 跳转到按日期查看检测列表的页面
     goToDateView() {
       // 使用命名路由，便于维护
       this.$router.push({ name: 'dateList' });
     }
   },
-  mounted() {
-    // 加载模拟数据
-    const mockRecords = [
-      { id: '001', time: '07/13 14:25', status: 'qualified', selected: false },
-      { id: '002', time: '07/13 14:25', status: 'defect', selected: false },
-      { id: '003', time: '07/13 14:25', status: 'pending', selected: false, progress: '80%' },
-      { id: '004', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '005', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '006', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '007', time: '07/13 14:15', status: 'qualified', selected: false },
-      { id: '008', time: '07/13 14:15', status: 'undetected', selected: false },
-      { id: '009', time: '07/13 14:15', status: 'undetected', selected: false },
-      { id: '010', time: '07/13 14:15', status: 'undetected', selected: false }
-    ];
-    this.loadInspectionRecords(mockRecords);
-  }
+  // 移除所有本地模拟数据加载，数据将由组件挂载时通过网络获取
 }
 </script>
 

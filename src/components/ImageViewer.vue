@@ -28,7 +28,7 @@
     <div class="controls">
       <!-- 操作按钮：使用 TDesign Button -->
       <t-button type="primary" @click="runDetection" :disabled="!imageSrc || hasBackendError">检测结果</t-button>
-      <t-button theme="success" :disabled="!imageSrc || hasBackendError">导出报告</t-button>
+      <!-- 删除“检测结果”右侧的“导出报告”按钮，保留单一操作以简化界面 -->
     </div>
   </div>
 </template>
@@ -45,19 +45,10 @@ export default {
   computed: {
     ...mapState(['currentImage', 'detectionResults', 'backendStatus']),
     imageSrc() {
-      // 如果没有选中记录，返回null
-      if (!this.currentImage) return null;
-      
-      // 如果有服务器图片路径，优先使用
-      if (this.currentImage.path) {
-        // 确保路径正确
-        console.log('使用服务器图片路径:', this.currentImage.path);
-        return this.currentImage.path;
-      } else {
-        // 如果没有服务器图片路径或path为null，使用本地示例图片
-        console.log('使用本地示例图片');
-        return require('@/assets/hinge-example.jpg');
-      }
+      // 只通过网络数据获取：无当前记录或无有效服务器路径则返回 null
+      if (!this.currentImage || !this.currentImage.path) return null;
+      // 返回后端提供的图片地址
+      return this.currentImage.path;
     },
     hasBackendError() {
       return this.backendStatus === 'error';
