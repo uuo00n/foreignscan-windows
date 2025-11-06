@@ -19,11 +19,20 @@ export default createStore({
     SET_CURRENT_RECORD(state, record) {
       state.currentRecord = record;
       if (record) {
-        // 设置当前图片，使用服务器图片路径
+        // 设置当前图片，按照后端返回规范拼接完整图片 URL
+        // 后端数据示例中的 path 为相对路径：uploads/images/{sceneId}/{filename}
+        const baseURL = 'http://localhost:3000/';
+        let fullPath = null;
+        if (record.path) {
+          // 优先使用后端返回的相对路径
+          fullPath = baseURL + record.path;
+        } else if (record.sceneId && record.filename) {
+          // 兼容后端未返回 path 字段的情况，根据 sceneId 与 filename 拼接
+          fullPath = `${baseURL}uploads/images/${record.sceneId}/${record.filename}`;
+        }
         state.currentImage = {
           id: record.id,
-          // 修复图片路径，使用新的格式: /uploads/images/{图片ID}/{文件名}
-          path: record.filename ? `http://localhost:3000/uploads/images/${record.id}/${record.filename}` : null
+          path: fullPath
         };
         // 清空检测结果
         state.detectionResults = [];
