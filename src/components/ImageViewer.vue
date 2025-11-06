@@ -1,28 +1,31 @@
 <template>
   <div class="image-viewer">
     <div class="image-container">
-      <!-- 图片显示：优先使用后端路径，其次使用本地示例 -->
-      <img :src="imageSrc" alt="检测图片" v-if="imageSrc" />
+      <!-- 内层舞台区域：在图片显示部分添加适当的内边距，以增加留白 -->
+      <div class="image-stage">
+        <!-- 图片显示：优先使用后端路径 -->
+        <img :src="imageSrc" alt="检测图片" v-if="imageSrc" />
 
-      <!-- 后端异常提示：使用 TDesign Alert，更友好的错误展示 -->
-      <t-alert v-else-if="hasBackendError" theme="error" title="后端异常" description="无法获取图片，请检查服务状态" />
+        <!-- 后端异常提示：使用 TDesign Alert，更友好的错误展示 -->
+        <t-alert v-else-if="hasBackendError" theme="error" title="后端异常" description="无法获取图片，请检查服务状态" />
 
-      <!-- 无图提示：使用 TDesign Empty -->
-      <t-empty v-else description="请选择一个检测记录查看图片" />
+        <!-- 无图提示：使用 TDesign Empty -->
+        <t-empty v-else description="请选择一个检测记录查看图片" />
 
-      <!-- 检测标记框：保持现有绘制逻辑 -->
-      <div class="detection-markers" v-if="detectionResults.length > 0">
-        <div 
-          v-for="(result, index) in detectionResults" 
-          :key="index" 
-          class="marker"
-          :style="{
-            left: `${result.x}px`,
-            top: `${result.y}px`,
-            width: `${result.width}px`,
-            height: `${result.height}px`
-          }"
-        ></div>
+        <!-- 检测标记框：保持现有绘制逻辑，绝对定位于舞台内 -->
+        <div class="detection-markers" v-if="detectionResults.length > 0">
+          <div 
+            v-for="(result, index) in detectionResults" 
+            :key="index" 
+            class="marker"
+            :style="{
+              left: `${result.x}px`,
+              top: `${result.y}px`,
+              width: `${result.width}px`,
+              height: `${result.height}px`
+            }"
+          ></div>
+        </div>
       </div>
     </div>
     <div class="controls">
@@ -135,6 +138,18 @@ export default {
   align-items: center;
   background-color: #f0f0f0;
   overflow: hidden;
+}
+
+/* 舞台区域：在图片显示部分设置内边距，确保图片与容器边缘有合理留白 */
+.image-stage {
+  position: relative;              /* 作为标记层的定位参考 */
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;         /* 让 padding 不影响计算宽高 */
+  padding: 12px;                  /* 适度留白，可按需调整（如 8px/16px） */
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .image-container img {
