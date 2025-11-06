@@ -22,7 +22,8 @@ export default createStore({
         // 设置当前图片，使用服务器图片路径
         state.currentImage = {
           id: record.id,
-          path: record.filename ? `http://localhost:3000/uploads/${record.filename}` : null
+          // 修复图片路径，使用新的格式: /uploads/images/{图片ID}/{文件名}
+          path: record.filename ? `http://localhost:3000/uploads/images/${record.id}/${record.filename}` : null
         };
         // 清空检测结果
         state.detectionResults = [];

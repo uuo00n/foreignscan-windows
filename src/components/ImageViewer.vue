@@ -1,9 +1,16 @@
 <template>
   <div class="image-viewer">
     <div class="image-container">
+      <!-- 图片显示：优先使用后端路径，其次使用本地示例 -->
       <img :src="imageSrc" alt="检测图片" v-if="imageSrc" />
-      <div class="backend-error" v-else-if="hasBackendError">后端异常，无法获取图片</div>
-      <div class="no-image" v-else>请选择一个检测记录查看图片</div>
+
+      <!-- 后端异常提示：使用 TDesign Alert，更友好的错误展示 -->
+      <t-alert v-else-if="hasBackendError" theme="error" title="后端异常" description="无法获取图片，请检查服务状态" />
+
+      <!-- 无图提示：使用 TDesign Empty -->
+      <t-empty v-else description="请选择一个检测记录查看图片" />
+
+      <!-- 检测标记框：保持现有绘制逻辑 -->
       <div class="detection-markers" v-if="detectionResults.length > 0">
         <div 
           v-for="(result, index) in detectionResults" 
@@ -19,8 +26,9 @@
       </div>
     </div>
     <div class="controls">
-      <button class="detection-btn" @click="runDetection" :disabled="!imageSrc || hasBackendError">检测结果</button>
-      <button class="export-btn" :disabled="!imageSrc || hasBackendError">导出报告</button>
+      <!-- 操作按钮：使用 TDesign Button -->
+      <t-button type="primary" @click="runDetection" :disabled="!imageSrc || hasBackendError">检测结果</t-button>
+      <t-button theme="success" :disabled="!imageSrc || hasBackendError">导出报告</t-button>
     </div>
   </div>
 </template>
@@ -146,23 +154,5 @@ export default {
   padding: 10px;
   gap: 10px;
   background-color: #f5f5f5;
-}
-
-.controls button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.detection-btn {
-  background-color: #4285f4;
-  color: white;
-}
-
-.export-btn {
-  background-color: #34a853;
-  color: white;
 }
 </style>

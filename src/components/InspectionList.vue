@@ -1,42 +1,59 @@
 <template>
   <div class="inspection-list">
-    <div class="tabs">
-      <div class="tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">全部</div>
-      <div class="tab" :class="{ active: activeTab === 'qualified' }" @click="activeTab = 'qualified'">合格</div>
-      <div class="tab" :class="{ active: activeTab === 'defect' }" @click="activeTab = 'defect'">缺陷</div>
-      <div class="tab" :class="{ active: activeTab === 'undetected' }" @click="activeTab = 'undetected'">未检测</div>
-    </div>
-    
-    <!-- 后端异常提示 -->
-    <div class="backend-error" v-if="hasBackendError">
-      <p>{{ backendError || '后端异常，请检查后端服务是否正常运行' }}</p>
-      <button @click="retryConnection" class="retry-btn">重试连接</button>
-    </div>
-    
-    <div class="list-container" v-else>
-      <div 
-        v-for="record in filteredRecords" 
-        :key="record.id" 
-        class="record-item"
-        :class="{ active: currentRecord && currentRecord.id === record.id }"
+    <!-- 顶部筛选标签：使用 TDesign Tabs -->
+    <!-- 关键：使用 v-model 双向绑定当前标签页 -->
+    <t-tabs v-model="activeTab" placement="top">
+      <t-tab-panel value="all" label="全部" />
+      <t-tab-panel value="qualified" label="合格" />
+      <t-tab-panel value="defect" label="缺陷" />
+      <t-tab-panel value="undetected" label="未检测" />
+    </t-tabs>
+
+    <!-- 后端异常提示：使用 TDesign Alert -->
+    <t-alert
+      v-if="hasBackendError"
+      theme="error"
+      title="后端异常"
+      :description="backendError || '请检查后端服务是否正常运行'"
+      close
+    >
+      <template #operation>
+        <t-button size="small" variant="base" @click="retryConnection">重试连接</t-button>
+      </template>
+    </t-alert>
+
+    <!-- 列表容器：使用 TDesign List -->
+    <t-list class="list-container" v-else split>
+      <t-list-item
+        v-for="record in filteredRecords"
+        :key="record.id"
         @click="selectRecord(record)"
+        :class="{ active: currentRecord && currentRecord.id === record.id }"
       >
-        <div class="checkbox">
-          <input type="checkbox" :id="'check-' + record.id" v-model="record.selected">
+        <div class="item-row">
+          <!-- 选择框：使用 TDesign Checkbox -->
+          <t-checkbox v-model="record.selected" :name="'check-' + record.id" />
+          <div class="record-info">
+            <div class="record-id">{{ formatDisplayId(record) }}</div>
+            <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
+            <!-- 状态标签：使用 TDesign Tag，并根据状态动态主题颜色 -->
+            <t-tag :theme="statusTheme(record.status)" variant="light" size="small">
+              {{ getStatusText(record.status) }}
+            </t-tag>
+          </div>
         </div>
-        <div class="record-info">
-          <div class="record-id">{{ formatDisplayId(record) }}</div>
-          <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
-          <div class="record-status" :class="record.status">{{ getStatusText(record.status) }}</div>
-        </div>
-      </div>
-      <div class="no-data" v-if="filteredRecords.length === 0">
-        <p>暂无数据</p>
-      </div>
-    </div>
-    
+      </t-list-item>
+      <!-- 空态提示：使用 TDesign Empty -->
+      <template v-if="filteredRecords.length === 0">
+        <t-list-item>
+          <t-empty description="暂无数据" />
+        </t-list-item>
+      </template>
+    </t-list>
+
+    <!-- 底部操作按钮：使用 TDesign Button -->
     <div class="action-buttons">
-      <button class="export-btn" :disabled="filteredRecords.length === 0 || hasBackendError">导出报告</button>
+      <t-button block type="primary" :disabled="filteredRecords.length === 0 || hasBackendError">导出报告</t-button>
     </div>
   </div>
 </template>
@@ -84,6 +101,16 @@ export default {
         case 'pending': return '待检';
         case 'undetected': return '未检测';
         default: return '未知';
+      }
+    },
+    // 根据状态返回 TDesign Tag 的主题颜色
+    statusTheme(status) {
+      switch (status) {
+        case 'qualified': return 'success';
+        case 'defect': return 'danger';
+        case 'pending': return 'default';
+        case 'undetected': return 'warning';
+        default: return 'default';
       }
     },
     formatDisplayId(record) {
@@ -134,48 +161,19 @@ export default {
   border-right: 1px solid #e0e0e0;
 }
 
-.tabs {
-  display: flex;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.tab {
-  flex: 1;
-  text-align: center;
-  padding: 10px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.tab.active {
-  font-weight: bold;
-  border-bottom: 2px solid #4285f4;
-}
-
 .list-container {
   flex: 1;
   overflow-y: auto;
 }
 
-.record-item {
-  display: flex;
-  padding: 10px;
-  border-bottom: 1px solid #f0f0f0;
-  cursor: pointer;
+.active {
+  background-color: #f3f3f3;
 }
 
-.record-item:hover {
-  background-color: #f9f9f9;
-}
-
-.record-item.active {
-  background-color: #e8f0fe;
-}
-
-.checkbox {
+.item-row {
   display: flex;
   align-items: center;
-  margin-right: 10px;
+  gap: 12px;
 }
 
 .record-info {
@@ -193,28 +191,6 @@ export default {
   margin-bottom: 5px;
 }
 
-.record-status {
-  display: inline-block;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 10px;
-}
-
-.record-status.qualified {
-  background-color: #e6f4ea;
-  color: #137333;
-}
-
-.record-status.defect {
-  background-color: #fce8e6;
-  color: #c5221f;
-}
-
-.record-status.pending {
-  background-color: #e8eaed;
-  color: #5f6368;
-}
-
 .no-data {
   display: flex;
   justify-content: center;
@@ -230,15 +206,5 @@ export default {
   display: flex;
   justify-content: center;
   border-top: 1px solid #e0e0e0;
-}
-
-.export-btn {
-  width: 100%;
-  padding: 8px;
-  background-color: #4285f4;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
 }
 </style>

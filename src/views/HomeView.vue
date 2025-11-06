@@ -3,9 +3,13 @@
     <header class="app-header">
       <div class="logo">智能防务检测系统</div>
       <div class="actions">
-        <button class="action-btn">开始</button>
-        <button class="action-btn">合格</button>
-        <button class="action-btn">缺陷</button>
+        <!-- 使用 TDesign 按钮组件替换原生按钮 -->
+        <!-- 说明：后续可在 @click 里绑定筛选或启动逻辑 -->
+        <t-space size="small">
+          <t-button type="primary">开始</t-button>
+          <t-button theme="success">合格</t-button>
+          <t-button theme="danger">缺陷</t-button>
+        </t-space>
       </div>
     </header>
     
