@@ -22,34 +22,36 @@
       </template>
     </t-alert>
 
-    <!-- 列表容器：使用 TDesign List -->
-    <t-list class="list-container" v-else split>
-      <t-list-item
-        v-for="record in filteredRecords"
-        :key="record.id"
-        @click="selectRecord(record)"
-        :class="{ active: currentRecord && currentRecord.id === record.id }"
-      >
-        <div class="item-row">
-          <!-- 选择框：使用 TDesign Checkbox -->
-          <t-checkbox v-model="record.selected" :name="'check-' + record.id" />
-          <div class="record-info">
-            <div class="record-id">{{ formatDisplayId(record) }}</div>
-            <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
-            <!-- 状态标签：使用 TDesign Tag，并根据状态动态主题颜色 -->
-            <t-tag :theme="statusTheme(record.status)" variant="light" size="small">
-              {{ getStatusText(record.status) }}
-            </t-tag>
+    <!-- 列表容器与空态：后端正常时展示。根据筛选结果有无数据切换显示 -->
+    <template v-else>
+      <!-- 有数据：展示列表 -->
+      <t-list v-if="filteredRecords.length > 0" class="list-container" split>
+        <t-list-item
+          v-for="record in filteredRecords"
+          :key="record.id"
+          @click="selectRecord(record)"
+          :class="{ active: currentRecord && currentRecord.id === record.id }"
+        >
+          <div class="item-row">
+            <!-- 选择框：使用 TDesign Checkbox -->
+            <t-checkbox v-model="record.selected" :name="'check-' + record.id" />
+            <div class="record-info">
+              <div class="record-id">{{ formatDisplayId(record) }}</div>
+              <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
+              <!-- 状态标签：使用 TDesign Tag，并根据状态动态主题颜色 -->
+              <t-tag :theme="statusTheme(record.status)" variant="light" size="small">
+                {{ getStatusText(record.status) }}
+              </t-tag>
+            </div>
           </div>
-        </div>
-      </t-list-item>
-      <!-- 空态提示：使用 TDesign Empty -->
-      <template v-if="filteredRecords.length === 0">
-        <t-list-item>
-          <t-empty description="暂无数据" />
         </t-list-item>
-      </template>
-    </t-list>
+      </t-list>
+      <!-- 无数据：在列表区域居中显示空态 -->
+      <div v-else class="list-empty">
+        <!-- 使用 TDesign Empty 组件，容器通过 flex 居中 -->
+        <t-empty description="暂无数据" />
+      </div>
+    </template>
 
     <!-- 底部操作按钮：使用 TDesign Button -->
     <div class="action-buttons">
@@ -164,6 +166,15 @@ export default {
 .list-container {
   flex: 1;
   overflow-y: auto;
+}
+
+/* 空态容器：填满列表区域，居中显示 */
+.list-empty {
+  flex: 1;
+  display: flex;
+  align-items: center; /* 垂直居中 */
+  justify-content: center; /* 水平居中 */
+  padding: 16px;
 }
 
 .active {
