@@ -36,7 +36,11 @@
             <!-- 选择框：使用 TDesign Checkbox -->
             <t-checkbox v-model="record.selected" :name="'check-' + record.id" />
             <div class="record-info">
-              <div class="record-id">{{ formatDisplayId(record) }}</div>
+              <!-- 场景名：仅展示场景名，不再展示ID -->
+              <div class="record-scene">{{ getSceneName(record) }}</div>
+              <!-- 检测日期：显示在检测时间上方 -->
+              <div class="record-date">检测日期：{{ safeDateText(record) }}</div>
+              <!-- 检测时间：保持原有格式化逻辑 -->
               <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
               <!-- 状态标签：使用 TDesign Tag，并根据状态动态主题颜色 -->
               <t-tag :theme="statusTheme(record.status)" variant="light" size="small">
@@ -71,7 +75,8 @@ export default {
     };
   },
   computed: {
-    ...mapState(['inspectionRecords', 'currentRecord', 'backendStatus', 'backendError']),
+    // 引入场景名称映射，用于根据 sceneId 显示场景中文名
+    ...mapState(['inspectionRecords', 'currentRecord', 'backendStatus', 'backendError', 'sceneNameMap']),
     hasBackendError() {
       return this.backendStatus === 'error';
     },
@@ -89,7 +94,7 @@ export default {
     }
   },
   methods: {
-    ...mapActions(['setCurrentRecord', 'fetchImagesFromServer']),
+    ...mapActions(['setCurrentRecord', 'fetchImagesFromServer', 'fetchSceneNameMap']),
     selectRecord(record) {
       this.setCurrentRecord(record);
     },
@@ -115,19 +120,18 @@ export default {
         default: return 'default';
       }
     },
-    formatDisplayId(record) {
-      // 如果没有timestamp或sceneId，则使用原始id
-      if (!record.timestamp && !record.sceneId) {
-        return record.id || '未知ID';
-      }
-      
-      // 格式化日期和时间
-      const date = this.formatDate(record.timestamp);
-      const time = this.formatTime(record.timestamp);
-      const sceneId = record.sceneId || '未知场景';
-      
-      // 返回格式化后的显示文本：日期-时间-场景id
-      return `${date}-${time}-${sceneId}`;
+    // 仅展示场景名：根据 sceneId 查映射，若无映射则使用 record.sceneName/scene，最后回退“未知场景”
+    getSceneName(record) {
+      if (!record) return '未知场景';
+      const id = record.sceneId != null ? String(record.sceneId) : null;
+      const byMap = id && this.sceneNameMap ? this.sceneNameMap[id] : null;
+      return byMap || record.sceneName || record.scene || '未知场景';
+    },
+    // 检测日期显示：优先使用 record.date；其次从 timestamp 格式化；都没有则显示“未知日期”
+    safeDateText(record) {
+      if (record && record.date) return record.date;
+      if (record && record.timestamp) return this.formatDate(record.timestamp);
+      return '未知日期';
     },
     formatDate(timestamp) {
       if (!timestamp) return '';
@@ -146,6 +150,13 @@ export default {
   async mounted() {
     // 从服务器加载图片数据
     await this.loadImages();
+    // 并行获取场景名称映射（若后端支持），用于将 sceneId 显示为中文名称
+    try {
+      await this.fetchSceneNameMap();
+    } catch (e) {
+      // 后端未提供映射或请求失败时忽略，保持“未知场景”回退
+      console.warn('场景名称映射获取失败，已使用回退显示:', e);
+    }
     
     // 如果有记录但没有选中的记录，默认选中第一个
     if (this.inspectionRecords.length > 0 && !this.currentRecord) {
@@ -191,9 +202,17 @@ export default {
   flex: 1;
 }
 
-.record-id {
-  font-weight: bold;
-  margin-bottom: 5px;
+/* 场景名：替代原来的ID显示 */
+.record-scene {
+  font-weight: bold;          /* 强调场景名 */
+  margin-bottom: 4px;         /* 与日期之间保持紧凑间距 */
+}
+
+/* 检测日期：显示在时间上方 */
+.record-date {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;         /* 与时间之间保持紧凑间距 */
 }
 
 .record-time {

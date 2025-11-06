@@ -6,6 +6,8 @@ export default createStore({
     currentRecord: null,
     currentImage: null,
     detectionResults: [],
+    // 场景名称映射：由后端提供 sceneId -> 场景名称 的映射
+    sceneNameMap: {},
     // 右侧“检测结果”面板显示控制：默认隐藏，点击“检测结果”后显示
     showResultsPanel: false,
     backendStatus: 'unknown', // 'connected', 'error'
@@ -55,6 +57,11 @@ export default createStore({
     SET_BACKEND_ERROR(state, error) {
       state.backendError = error;
     },
+    // 设置场景名称映射
+    SET_SCENE_NAME_MAP(state, map) {
+      // 避免不必要的对象复制：直接赋值即可
+      state.sceneNameMap = map || {};
+    },
     // 显示/隐藏检测结果面板（备用）
     SET_SHOW_RESULTS_PANEL(state, show) {
       state.showResultsPanel = !!show;
@@ -63,6 +70,48 @@ export default createStore({
   actions: {
     loadInspectionRecords({ commit }, records) {
       commit('SET_INSPECTION_RECORDS', records);
+    },
+    // 获取场景名称映射：兼容两种返回结构
+    // 1) { scenes: [{ id: 'hinge', name: '铰链' }, ...] }
+    // 2) { map: { hinge: '铰链', ... } } 或直接返回 { hinge: '铰链', ... }
+    async fetchSceneNameMap({ commit, dispatch }) {
+      try {
+        // 确保后端健康：如果之前未检测过，先尝试健康检查，但不强制依赖
+        if ((await dispatch('checkBackendHealth')) === false) {
+          commit('SET_SCENE_NAME_MAP', {});
+          return {};
+        }
+
+        const response = await fetch('http://localhost:3000/api/scenes');
+        const data = await response.json();
+
+        let map = {};
+        if (response.ok) {
+          if (data && Array.isArray(data.scenes)) {
+            // 数组结构：转换为 map
+            map = data.scenes.reduce((acc, s) => {
+              if (s && (s.id != null) && s.name) {
+                acc[String(s.id)] = s.name;
+              }
+              return acc;
+            }, {});
+          } else if (data && data.map && typeof data.map === 'object') {
+            map = data.map;
+          } else if (data && typeof data === 'object') {
+            // 直接返回 map 的情况
+            map = data;
+          }
+          commit('SET_SCENE_NAME_MAP', map || {});
+          return map || {};
+        } else {
+          commit('SET_SCENE_NAME_MAP', {});
+          return {};
+        }
+      } catch (error) {
+        console.error('获取场景映射失败:', error);
+        commit('SET_SCENE_NAME_MAP', {});
+        return {};
+      }
     },
     // 健康检查接口
     async checkBackendHealth({ commit }) {
