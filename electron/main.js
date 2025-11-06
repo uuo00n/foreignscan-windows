@@ -23,17 +23,35 @@ function createWindow() {
   if (isDevelopment) {
     // 开发环境下，加载本地开发服务器
     mainWindow.loadURL('http://localhost:8080');
-    // 打开开发者工具
-    mainWindow.webContents.openDevTools();
+    // 通过环境变量控制是否打开开发者工具，默认不打开
+    // 使用方式：在启动命令前设置 ELECTRON_OPEN_DEVTOOLS=true 才会打开
+    // 例如：ELECTRON_OPEN_DEVTOOLS=true npm run electron:serve
+    const shouldOpenDevTools = process.env.ELECTRON_OPEN_DEVTOOLS === 'true';
+    if (shouldOpenDevTools) {
+      mainWindow.webContents.openDevTools();
+    }
   } else {
     // 生产环境下，加载打包后的index.html
     mainWindow.loadURL(`file://${path.join(__dirname, '../dist/index.html')}`);
+    // 同样支持通过环境变量在生产环境下打开开发者工具（默认不打开）
+    const shouldOpenDevTools = process.env.ELECTRON_OPEN_DEVTOOLS === 'true';
+    if (shouldOpenDevTools) {
+      mainWindow.webContents.openDevTools();
+    }
   }
 
   // 当窗口关闭时触发
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Windows 平台：在主窗口关闭时确保应用完全退出
+  // 说明：配合 window-all-closed 中的 app.quit()，保证 Win32 下关闭窗口即退出进程
+  if (process.platform === 'win32') {
+    mainWindow.on('close', () => {
+      app.quit();
+    });
+  }
 }
 
 // 当Electron完成初始化并准备创建浏览器窗口时调用此方法
@@ -41,11 +59,9 @@ app.on('ready', createWindow);
 
 // 所有窗口关闭时退出应用
 app.on('window-all-closed', () => {
-  // 在macOS上，除非用户使用Cmd + Q确定地退出
-  // 否则绝大部分应用会保持活动状态
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // 关闭所有窗口后，直接退出应用（包含 macOS）
+  // 说明：默认 macOS 会保持应用不退出，这里按需求改为完全退出
+  app.quit();
 });
 
 app.on('activate', () => {
