@@ -43,7 +43,8 @@ const ipcRenderer = electron ? electron.ipcRenderer : null;
 export default {
   name: 'ImageViewer',
   computed: {
-    ...mapState(['currentImage', 'detectionResults', 'backendStatus']),
+    // 读取当前图片、检测结果以及右侧面板显隐状态
+    ...mapState(['currentImage', 'detectionResults', 'backendStatus', 'showResultsPanel']),
     imageSrc() {
       // 只通过网络数据获取：无当前记录或无有效服务器路径则返回 null
       if (!this.currentImage || !this.currentImage.path) return null;
@@ -55,8 +56,23 @@ export default {
     }
   },
   methods: {
-    ...mapActions(['setDetectionResults']),
+    // 引入设置结果与显隐状态的动作
+    ...mapActions(['setDetectionResults', 'setShowResultsPanel']),
     async runDetection() {
+      // 点击同一个按钮实现“显示/隐藏”切换：
+      // 1) 若面板已显示，则本次点击仅隐藏面板，不重复请求
+      if (this.showResultsPanel) {
+        this.setShowResultsPanel(false);
+        return;
+      }
+
+      // 2) 若已有检测结果但面板未显示，直接显示结果（避免重复请求）
+      if (this.detectionResults && this.detectionResults.length > 0) {
+        this.setShowResultsPanel(true);
+        return;
+      }
+
+      // 3) 无结果时才发起检测请求
       if (!this.currentImage || !this.currentImage.id) {
         return;
       }

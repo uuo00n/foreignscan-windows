@@ -6,6 +6,8 @@ export default createStore({
     currentRecord: null,
     currentImage: null,
     detectionResults: [],
+    // 右侧“检测结果”面板显示控制：默认隐藏，点击“检测结果”后显示
+    showResultsPanel: false,
     backendStatus: 'unknown', // 'connected', 'error'
     backendError: null
   },
@@ -36,18 +38,26 @@ export default createStore({
         };
         // 清空检测结果
         state.detectionResults = [];
+        // 切换记录时默认隐藏右侧面板，等待用户点击“检测结果”
+        state.showResultsPanel = false;
       } else {
         state.currentImage = null;
       }
     },
     SET_DETECTION_RESULTS(state, results) {
       state.detectionResults = results;
+      // 用户点击“检测结果”后，无论结果是否为空，都显示右侧面板
+      state.showResultsPanel = true;
     },
     SET_BACKEND_STATUS(state, status) {
       state.backendStatus = status;
     },
     SET_BACKEND_ERROR(state, error) {
       state.backendError = error;
+    },
+    // 显示/隐藏检测结果面板（备用）
+    SET_SHOW_RESULTS_PANEL(state, show) {
+      state.showResultsPanel = !!show;
     }
   },
   actions: {
@@ -112,6 +122,10 @@ export default createStore({
     },
     setDetectionResults({ commit }, results) {
       commit('SET_DETECTION_RESULTS', results);
+    },
+    // 显示/隐藏右侧面板的 Action（供需要时直接调用）
+    setShowResultsPanel({ commit }, show) {
+      commit('SET_SHOW_RESULTS_PANEL', show);
     }
   },
   modules: {

@@ -20,9 +20,12 @@
       <div class="main-content">
         <ImageViewer />
       </div>
-      <div class="results-panel">
-        <DetectionResults />
-      </div>
+      <!-- 右侧检测结果面板：默认隐藏，点击“检测结果”后以动画滑入展示 -->
+      <transition name="results-slide">
+        <div class="results-panel" v-if="showResultsPanel">
+          <DetectionResults />
+        </div>
+      </transition>
     </main>
     
     <footer class="app-footer">
@@ -62,6 +65,7 @@
 import InspectionList from '@/components/InspectionList.vue';
 import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
+import { mapState } from 'vuex'; // 读取全局状态
 // 引入 TDesign 图标库中的日历图标
 import { CalendarIcon } from 'tdesign-icons-vue-next';
 
@@ -72,6 +76,10 @@ export default {
     ImageViewer,
     DetectionResults,
     CalendarIcon
+  },
+  computed: {
+    // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
+    ...mapState(['showResultsPanel'])
   },
   methods: {
     // 跳转到按日期查看检测列表的页面
@@ -149,6 +157,33 @@ body {
 .results-panel {
   width: 250px;
   overflow-y: auto;
+}
+
+/* 右侧面板入场/退场动画：保持两者“速度一致”，统一时长与缓动 */
+.results-slide-enter-active,
+.results-slide-leave-active {
+  transition: transform 240ms ease-in-out, /* 统一 240ms，缓动一致 */
+              opacity 240ms ease-in-out;
+  will-change: transform, opacity; /* 提升动画流畅度 */
+}
+/* 入场起点与退场终点：位移更明显，且透明度更低，视觉更自然 */
+.results-slide-enter-from,
+.results-slide-leave-to {
+  transform: translateX(24px); /* 从右侧更明显的位移进入/离开 */
+  opacity: 0.01;               /* 减少闪烁 */
+}
+.results-slide-enter-to,
+.results-slide-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* 无障碍：尊重系统“减少动态效果”设置，若开启则禁用动画 */
+@media (prefers-reduced-motion: reduce) {
+  .results-slide-enter-active,
+  .results-slide-leave-active {
+    transition: none;
+  }
 }
 
 .app-footer {
