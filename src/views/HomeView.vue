@@ -40,6 +40,20 @@
           <span class="value">20</span>
         </div>
       </div>
+      <!-- 底部右侧的操作区域：放置日期跳转按钮 -->
+      <div class="footer-action">
+        <t-button
+          class="calendar-btn"
+          shape="circle"
+          size="medium"
+          theme="primary"
+          @click="goToDateView"
+          title="按日期查看检测列表"
+        >
+          <!-- 使用 TDesign 图标库的日历图标 -->
+          <CalendarIcon size="20" />
+        </t-button>
+      </div>
     </footer>
   </div>
 </template>
@@ -49,16 +63,24 @@ import InspectionList from '@/components/InspectionList.vue';
 import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
 import { mapActions } from 'vuex';
+// 引入 TDesign 图标库中的日历图标
+import { CalendarIcon } from 'tdesign-icons-vue-next';
 
 export default {
   name: 'HomeView',
   components: {
     InspectionList,
     ImageViewer,
-    DetectionResults
+    DetectionResults,
+    CalendarIcon
   },
   methods: {
-    ...mapActions(['loadInspectionRecords'])
+    ...mapActions(['loadInspectionRecords']),
+    // 跳转到按日期查看检测列表的页面
+    goToDateView() {
+      // 使用命名路由，便于维护
+      this.$router.push({ name: 'dateList' });
+    }
   },
   mounted() {
     // 加载模拟数据
@@ -150,11 +172,15 @@ body {
   padding: 10px 20px;
   background-color: #f5f5f5;
   border-top: 1px solid #e0e0e0;
+  display: flex;               /* 使底部为左右布局 */
+  justify-content: space-between; /* 左侧状态信息，右侧按钮 */
+  align-items: center;         /* 垂直居中 */
 }
 
 .status-info {
-  display: flex;
-  justify-content: space-around;
+  display: flex;                 /* 使用 Flex 布局 */
+  align-items: center;           /* 垂直居中 */
+  gap: 24px;                     /* 三个状态块之间的固定间距 */
 }
 
 .status-item {
@@ -169,5 +195,16 @@ body {
 
 .value {
   font-weight: bold;
+}
+
+/* 右下角浮动圆形按钮样式 */
+.footer-action {
+  display: flex;
+  align-items: center;
+}
+
+.calendar-btn {
+  /* 放置于底部栏右侧，避免越界 */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 </style>
