@@ -166,6 +166,67 @@ export default createStore({
         return [];
       }
     },
+    // 使用 /images/filter 根据状态（以及可选的时间范围）获取筛选后的图片列表
+    // 注意：后端接口期望的 status 为中文："合格" | "缺陷" | "未检测"
+    // 前端 Tabs 使用的英文 key："qualified" | "defect" | "undetected"，需要做一次映射
+    async fetchImagesByFilter({ commit, dispatch }, { status, start = null, end = null } = {}) {
+      try {
+        // 后端健康检查：若失败则直接清空并返回
+        const isHealthy = await dispatch('checkBackendHealth');
+        if (!isHealthy) {
+          commit('SET_INSPECTION_RECORDS', []);
+          return [];
+        }
+
+        // 将英文状态 key 映射为后端需要的中文值
+        const statusMap = {
+          qualified: '合格',
+          defect: '缺陷',
+          undetected: '未检测'
+        };
+        // 如果传入的是中文，则直接使用；否则根据英文 key 转换
+        let statusText = status;
+        if (status && typeof status === 'string') {
+          statusText = statusMap[status] || status; // 允许直接传中文
+        }
+
+        // 若未指定状态或选择“全部”，回退到获取所有图片列表
+        if (!statusText || statusText === '全部' || status === 'all') {
+          return await dispatch('fetchImagesFromServer');
+        }
+
+        // 构建查询参数：仅在存在时添加，避免“神秘命名”和冗余参数
+        const qs = new URLSearchParams();
+        qs.set('status', statusText);
+        if (start) qs.set('start', start); // 支持 YYYY-MM-DD 或 RFC3339
+        if (end) qs.set('end', end);
+
+        // 发起筛选请求：根据后端路由注册，正确路径为 /api/images/filter
+        // 说明：后端在 cmd/server/main.go 中通过 api 组注册（api.GET("/images/filter", ...）），实际路径需带上 /api 前缀
+        const url = `http://localhost:3000/api/images/filter?${qs.toString()}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (response.ok) {
+          // 兼容返回结构：images 或 list
+          const images = Array.isArray(data.images) ? data.images : (Array.isArray(data.list) ? data.list : []);
+          commit('SET_INSPECTION_RECORDS', images);
+          return images;
+        } else {
+          // 返回非 2xx：认为后端异常
+          commit('SET_BACKEND_STATUS', 'error');
+          commit('SET_BACKEND_ERROR', data && data.message ? data.message : '筛选接口返回错误');
+          commit('SET_INSPECTION_RECORDS', []);
+          return [];
+        }
+      } catch (error) {
+        console.error('筛选请求失败:', error);
+        commit('SET_BACKEND_STATUS', 'error');
+        commit('SET_BACKEND_ERROR', '筛选请求失败');
+        commit('SET_INSPECTION_RECORDS', []);
+        return [];
+      }
+    },
     setCurrentRecord({ commit }, record) {
       commit('SET_CURRENT_RECORD', record);
     },

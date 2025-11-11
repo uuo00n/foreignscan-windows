@@ -81,25 +81,34 @@ export default {
       return this.backendStatus === 'error';
     },
     filteredRecords() {
+      // 兼容后端中文状态与前端英文状态，避免“明明有数据却显示为空”
       if (this.activeTab === 'all') {
         return this.inspectionRecords;
-      } else if (this.activeTab === 'qualified') {
-        return this.inspectionRecords.filter(record => record.status === 'qualified');
-      } else if (this.activeTab === 'defect') {
-        return this.inspectionRecords.filter(record => record.status === 'defect');
-      } else if (this.activeTab === 'undetected') {
-        return this.inspectionRecords.filter(record => record.status === 'undetected');
       }
-      return this.inspectionRecords;
+      // 映射表：英文标签值 -> [英文, 中文]
+      const map = {
+        qualified: ['qualified', '合格'],
+        defect: ['defect', '缺陷'],
+        undetected: ['undetected', '未检测']
+      };
+      const allow = map[this.activeTab] || [];
+      // 若当前列表已是筛选结果（通过 store.fetchImagesByFilter 返回），直接返回，避免重复过滤导致空列表
+      const first = this.inspectionRecords && this.inspectionRecords.length > 0 ? this.inspectionRecords[0] : null;
+      if (first && allow.includes(first.status)) {
+        return this.inspectionRecords;
+      }
+      // 否则按映射进行过滤（兼容中英文）
+      return (this.inspectionRecords || []).filter(record => allow.includes(record.status));
     }
   },
   methods: {
-    ...mapActions(['setCurrentRecord', 'fetchImagesFromServer', 'fetchSceneNameMap']),
+    ...mapActions(['setCurrentRecord', 'fetchImagesFromServer', 'fetchSceneNameMap', 'fetchImagesByFilter']),
     selectRecord(record) {
       this.setCurrentRecord(record);
     },
     async retryConnection() {
-      await this.fetchImagesFromServer();
+      // 重试时按当前标签重新加载，避免仅请求全部列表
+      await this.loadByTab();
     },
     getStatusText(status) {
       switch(status) {
@@ -143,13 +152,22 @@ export default {
       const date = new Date(timestamp);
       return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
     },
-    async loadImages() {
-      await this.fetchImagesFromServer();
+    // 根据当前标签页加载数据：
+    // - 全部：沿用旧接口获取所有图片
+    // - 其余状态：改用 /images/filter 接口按状态获取
+    async loadByTab() {
+      // 关键节点：减少分支嵌套，提前返回
+      if (this.activeTab === 'all') {
+        await this.fetchImagesFromServer();
+        return;
+      }
+      // 其它标签：调用筛选接口（store 内部完成中英文映射）
+      await this.fetchImagesByFilter({ status: this.activeTab });
     }
   },
   async mounted() {
-    // 从服务器加载图片数据
-    await this.loadImages();
+    // 首次进入：根据当前标签加载数据
+    await this.loadByTab();
     // 并行获取场景名称映射（若后端支持），用于将 sceneId 显示为中文名称
     try {
       await this.fetchSceneNameMap();
@@ -161,6 +179,20 @@ export default {
     // 如果有记录但没有选中的记录，默认选中第一个
     if (this.inspectionRecords.length > 0 && !this.currentRecord) {
       this.selectRecord(this.inspectionRecords[0]);
+    }
+  },
+  watch: {
+    // 监听标签切换：每次切换都重新请求并刷新列表
+    activeTab: {
+      immediate: false,
+      async handler() {
+        await this.loadByTab();
+        // 切换标签后，如有数据默认选中第一条（优先选当前过滤后的第一条）
+        const first = (this.filteredRecords && this.filteredRecords[0]) || (this.inspectionRecords && this.inspectionRecords[0]) || null;
+        if (first) {
+          this.selectRecord(first);
+        }
+      }
     }
   }
 }
