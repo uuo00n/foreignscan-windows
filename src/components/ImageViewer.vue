@@ -12,25 +12,18 @@
         <!-- 无图提示：使用 TDesign Empty -->
         <t-empty v-else description="请选择一个检测记录查看图片" />
 
-        <!-- 检测标记框：保持现有绘制逻辑，绝对定位于舞台内 -->
-        <div class="detection-markers" v-if="detectionResults.length > 0">
-          <div 
-            v-for="(result, index) in detectionResults" 
-            :key="index" 
-            class="marker"
-            :style="{
-              left: `${result.x}px`,
-              top: `${result.y}px`,
-              width: `${result.width}px`,
-              height: `${result.height}px`
-            }"
-          ></div>
-        </div>
       </div>
     </div>
     <div class="controls">
       <!-- 操作按钮：使用 TDesign Button -->
-      <t-button type="primary" @click="runDetection" :disabled="!imageSrc || hasBackendError">检测结果</t-button>
+      <!-- 当没有检测结果时不可点击，并显示“未检测”文案 -->
+      <t-button
+        type="primary"
+        @click="runDetection"
+        :disabled="!imageSrc || hasBackendError || !(detectionResults && detectionResults.length > 0)"
+      >
+        {{ (detectionResults && detectionResults.length > 0) ? '检测结果' : '未检测' }}
+      </t-button>
       <!-- 删除“检测结果”右侧的“导出报告”按钮，保留单一操作以简化界面 -->
     </div>
   </div>
@@ -51,9 +44,7 @@ export default {
     // 读取当前图片、检测结果以及右侧面板显隐状态
     ...mapState(['currentImage', 'detectionResults', 'backendStatus', 'showResultsPanel']),
     imageSrc() {
-      // 只通过网络数据获取：无当前记录或无有效服务器路径则返回 null
       if (!this.currentImage || !this.currentImage.path) return null;
-      // 返回后端提供的图片地址
       return this.currentImage.path;
     },
     hasBackendError() {
@@ -62,7 +53,7 @@ export default {
   },
   methods: {
     // 引入设置结果与显隐状态的动作
-    ...mapActions(['setDetectionResults', 'setShowResultsPanel']),
+    ...mapActions(['setDetectionResults', 'setShowResultsPanel', 'fetchDetectionsByImage']),
     async runDetection() {
       // 点击同一个按钮实现“显示/隐藏”切换：
       // 1) 若面板已显示，则本次点击仅隐藏面板，不重复请求
@@ -77,48 +68,26 @@ export default {
         return;
       }
 
-      // 3) 无结果时才发起检测请求
+      // 3) 无结果时，按新接口规范从后端读取检测结果：GET /api/images/{id}/detections
       if (!this.currentImage || !this.currentImage.id) {
         return;
       }
-      
+
       try {
-        // 通过IPC与主进程通信，调用后端API进行检测
-        if (ipcRenderer) {
-          // 使用正确的API格式
-          const results = await ipcRenderer.invoke('run-detection', {
-            imageId: this.currentImage.id
-          });
-          this.setDetectionResults(results || []);
-        } else {
-          // 浏览器环境下，直接调用API
-          try {
-            // 使用POST方法和正确的API路径
-            const response = await fetch(API_BASE + 'api/detect', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                imageId: this.currentImage.id
-              })
-            });
-            
-            const data = await response.json();
-            if (response.ok && data.results) {
-              this.setDetectionResults(data.results || []);
-            } else {
-              this.setDetectionResults([]);
-              console.error('检测失败:', data.message || '未知错误');
-            }
-          } catch (error) {
-            this.setDetectionResults([]);
-            console.error('检测请求失败:', error);
-          }
+        // 直接调用 Vuex Action，通过统一的 API_BASE 和新路径获取检测结果
+        const list = await this.$store.dispatch('fetchDetectionsByImage', { imageId: this.currentImage.id });
+        // 注：store 会在成功获取后自动 setDetectionResults 并打开右侧面板
+        // 若需要在此强制打开，可再调用 setShowResultsPanel(true)
+        if (!Array.isArray(list) || list.length === 0) {
+          // 如果后端暂时没有结果，清空并保持面板关闭
+          this.setDetectionResults([]);
+          this.setShowResultsPanel(false);
         }
       } catch (error) {
+        // 出错时清空结果并关闭面板
         this.setDetectionResults([]);
-        console.error('检测过程出错:', error);
+        this.setShowResultsPanel(false);
+        console.error('读取检测结果失败:', error);
       }
     }
   }
@@ -167,8 +136,8 @@ export default {
 
 .detection-markers .marker {
   position: absolute;
-  border: 2px solid red;
-  background-color: rgba(255, 0, 0, 0.2);
+  border: 2px solid #0052d9; /* 移除红色块，仅保留边框（TDesign 主色） */
+  background: transparent;    /* 不再覆盖图片内容，避免“红一块” */
   pointer-events: none;
 }
 

@@ -220,8 +220,6 @@ export default {
       }
     }
   },
-  computed: {
-  },
   // 移除所有本地模拟数据加载，数据将由组件挂载时通过网络获取
 }
 </script>
@@ -289,7 +287,8 @@ body {
 }
 
 .results-panel {
-  width: 250px;
+  width: 480px;
+  max-width: 50vw;
   overflow-y: auto;
 }
 

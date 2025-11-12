@@ -1,7 +1,8 @@
 <template>
   <div class="detection-results">
-    <!-- 头部使用 TDesign Card，标题更规范 -->
     <t-card title="检测结果" bordered>
+      <!-- 对比图：优先显示后端生成的处理后图片 -->
+      <img v-if="processedImagePath" :src="processedImagePath" alt="识别对比图" class="processed-image" />
       <!-- 有结果时使用 TDesign List 展示 -->
       <div v-if="detectionResults.length > 0" class="results-content">
         <t-list split>
@@ -33,7 +34,7 @@ import { mapState } from 'vuex';
 export default {
   name: 'DetectionResults',
   computed: {
-    ...mapState(['detectionResults'])
+    ...mapState(['detectionResults', 'processedImagePath'])
   }
 }
 </script>
@@ -61,6 +62,13 @@ export default {
   flex: 1;
   overflow-y: auto;
   padding: 10px;
+}
+
+.processed-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 10px;
 }
 
 .result-item {

@@ -104,17 +104,11 @@ ipcMain.handle('get-images', async () => {
 // 图片检测
 ipcMain.handle('run-detection', async (event, { imageId }) => {
   try {
-    const response = await fetch(API_BASE + 'api/detect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ imageId })
-    });
+    const response = await fetch(API_BASE + `api/images/${imageId}/detections`);
     
     if (response.ok) {
       const data = await response.json();
-      return data.results || [];
+      return data.detections || [];
     }
     return [];
   } catch (error) {

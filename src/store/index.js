@@ -21,12 +21,71 @@ const normalizeJob = (src) => {
   return { ID: id, Status: status || 'running', Progress: Number(progress) || 0, Total: Number(total) || 0, Message: String(message || '') };
 }
 
+
+// 统一检测结果字段：兼容后端不同命名/结构（含 detections[].items）
+const normalizeDetections = (raw) => {
+  // 解析顶层列表：可能为数组或对象属性
+  let top = [];
+  try {
+    if (Array.isArray(raw)) {
+      top = raw;
+    } else if (raw && Array.isArray(raw.detections)) {
+      top = raw.detections;
+    } else if (raw && Array.isArray(raw.results)) {
+      top = raw.results;
+    } else if (raw && Array.isArray(raw.data)) {
+      top = raw.data;
+    } else if (raw && raw.detection && Array.isArray(raw.detection)) {
+      top = raw.detection;
+    } else {
+      top = [];
+    }
+  } catch (_) {
+    top = [];
+  }
+  // 展平 detections[].items 结构为基础项列表
+  const baseItems = [];
+  for (const det of (top || [])) {
+    if (det && Array.isArray(det.items) && det.items.length > 0) {
+      for (const it of det.items) {
+        baseItems.push({ ...it });
+      }
+    } else {
+      baseItems.push(det);
+    }
+  }
+  // 统一为 { x, y, width, height, type, confidence }
+  return baseItems.map((i) => {
+    const bbox = i && i.bbox;
+    let x = 0, y = 0, width = 0, height = 0;
+    if (Array.isArray(bbox)) {
+      x = bbox[0]; y = bbox[1]; width = bbox[2]; height = bbox[3];
+    } else if (bbox && typeof bbox === 'object') {
+      x = bbox.x ?? bbox.left ?? bbox.minX ?? 0;
+      y = bbox.y ?? bbox.top ?? bbox.minY ?? 0;
+      width = (bbox.width ?? bbox.w ?? ((bbox.right ?? bbox.maxX ?? 0) - (bbox.left ?? bbox.minX ?? 0)));
+      height = (bbox.height ?? bbox.h ?? ((bbox.bottom ?? bbox.maxY ?? 0) - (bbox.top ?? bbox.minY ?? 0)));
+    } else {
+      x = i.x ?? 0; y = i.y ?? 0; width = i.width ?? 0; height = i.height ?? 0;
+    }
+    const type = i.class ?? i.type ?? i.label ?? i.category ?? '未知类型';
+    let confidence = i.confidence ?? i.score ?? i.probability ?? 0;
+    if (confidence > 1) confidence = confidence / 100;
+    width = Math.max(0, Number(width) || 0);
+    height = Math.max(0, Number(height) || 0);
+    x = Math.max(0, Number(x) || 0);
+    y = Math.max(0, Number(y) || 0);
+    return { x, y, width, height, type, confidence };
+  });
+};
+
 export default createStore({
   state: {
     inspectionRecords: [],
     currentRecord: null,
     currentImage: null,
     detectionResults: [],
+    processedImagePath: null,
     // 场景名称映射：由后端提供 sceneId -> 场景名称 的映射
     sceneNameMap: {},
     // 右侧“检测结果”面板显示控制：默认隐藏，点击“检测结果”后显示
@@ -63,6 +122,7 @@ export default createStore({
         };
         // 清空检测结果
         state.detectionResults = [];
+        state.processedImagePath = null;
         // 切换记录时默认隐藏右侧面板，等待用户点击“检测结果”
         state.showResultsPanel = false;
       } else {
@@ -88,6 +148,9 @@ export default createStore({
     // 显示/隐藏检测结果面板（备用）
     SET_SHOW_RESULTS_PANEL(state, show) {
       state.showResultsPanel = !!show;
+    },
+    SET_PROCESSED_IMAGE_PATH(state, path) {
+      state.processedImagePath = path || null;
     },
     // 任务状态更新：单个或批量
     SET_DETECT_JOB(state, job) {
@@ -388,12 +451,23 @@ export default createStore({
       if (!healthy) return [];
       try {
         const resp = await fetch(`${API_BASE}api/images/${imageId}/detections`);
-        const data = await resp.json();
-        if (resp.ok && data && Array.isArray(data.detections)) {
-          commit('SET_DETECTION_RESULTS', data.detections);
-          // 自动显示右侧面板
-          commit('SET_SHOW_RESULTS_PANEL', true);
-          return data.detections;
+        const raw = await resp.json();
+        if (resp.ok && raw) {
+          let processedUrl = null;
+          if (Array.isArray(raw)) {
+            processedUrl = raw[0] && raw[0].processedUrl ? raw[0].processedUrl : null;
+          } else if (raw && Array.isArray(raw.detections)) {
+            processedUrl = raw.detections[0] && raw.detections[0].processedUrl ? raw.detections[0].processedUrl : null;
+          }
+          if (processedUrl) {
+            commit('SET_PROCESSED_IMAGE_PATH', API_BASE + (processedUrl.startsWith('/') ? processedUrl.slice(1) : processedUrl));
+          }
+          const list = normalizeDetections(raw);
+          if (Array.isArray(list)) {
+            commit('SET_DETECTION_RESULTS', list);
+            commit('SET_SHOW_RESULTS_PANEL', true);
+            return list;
+          }
         }
         return [];
       } catch (e) {
