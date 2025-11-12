@@ -1,5 +1,24 @@
 import { createStore } from 'vuex'
 
+const normalizeJob = (src) => {
+  if (!src) return null;
+  const nested = src.job || {};
+  const id = src.ID || src.id || src.jobId || nested.ID || nested.id || nested.jobId || null;
+  let status = (src.Status || src.status || src.state || nested.Status || nested.status || nested.state || '').toLowerCase();
+  if (!status) {
+    if (src.done === true || nested.done === true) status = 'completed'; else status = 'running';
+  }
+  if (status === 'success') status = 'completed';
+  if (status === 'error') status = 'failed';
+  if (status === 'cancelled') status = 'canceled';
+  const percent = src.percent ?? src.percentage ?? nested.percent ?? nested.percentage;
+  let progress = src.Progress ?? src.progress ?? nested.Progress ?? nested.progress ?? 0;
+  let total = src.Total ?? src.total ?? nested.Total ?? nested.total ?? 0;
+  if ((percent != null) && (!total || Number(total) === 0)) { total = 100; progress = percent; }
+  const message = src.Message || src.message || nested.Message || nested.message || '';
+  return { ID: id, Status: status || 'running', Progress: Number(progress) || 0, Total: Number(total) || 0, Message: String(message || '') };
+}
+
 export default createStore({
   state: {
     inspectionRecords: [],
@@ -11,7 +30,9 @@ export default createStore({
     // 右侧“检测结果”面板显示控制：默认隐藏，点击“检测结果”后显示
     showResultsPanel: false,
     backendStatus: 'unknown', // 'connected', 'error'
-    backendError: null
+    backendError: null,
+    // 任务状态：jobId -> job
+    detectJobs: {}
   },
   getters: {
     hasBackendError: state => state.backendStatus === 'error'
@@ -65,6 +86,18 @@ export default createStore({
     // 显示/隐藏检测结果面板（备用）
     SET_SHOW_RESULTS_PANEL(state, show) {
       state.showResultsPanel = !!show;
+    },
+    // 任务状态更新：单个或批量
+    SET_DETECT_JOB(state, job) {
+      if (!job || !job.ID) return;
+      const id = job.ID;
+      state.detectJobs = { ...state.detectJobs, [id]: job };
+    },
+    REMOVE_DETECT_JOB(state, jobId) {
+      if (!jobId) return;
+      const next = { ...state.detectJobs };
+      delete next[jobId];
+      state.detectJobs = next;
     }
   },
   actions: {
@@ -236,6 +269,147 @@ export default createStore({
     // 显示/隐藏右侧面板的 Action（供需要时直接调用）
     setShowResultsPanel({ commit }, show) {
       commit('SET_SHOW_RESULTS_PANEL', show);
+    },
+    async startYOLOForSelected({ state, dispatch }, { ids = [], config = {} } = {}) {
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return [];
+      }
+      const healthy = await dispatch('checkBackendHealth');
+      if (!healthy) {
+        throw new Error('backend_unhealthy');
+      }
+      const body = config || {};
+      const tasks = ids.map((id) => (async () => {
+        try {
+          const resp = await fetch(`http://localhost:3000/api/images/${id}/detect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          let data = {};
+          try { data = await resp.json(); } catch (_) {}
+          const jobId = (data && (data.jobId || data.id || (data.job && (data.job.id || data.job.jobId)))) || null;
+          return { id, ok: resp.ok, jobId };
+        } catch (error) {
+          return { id, ok: false, error: String(error) };
+        }
+      })());
+      const settled = await Promise.allSettled(tasks);
+      return settled.map((r, i) => r.status === 'fulfilled' ? r.value : { id: ids[i], ok: false, error: String(r.reason) });
+    },
+    async initDetectJobs({ commit }, jobPairs = []) {
+      try {
+        for (const pair of (jobPairs || [])) {
+          if (!pair || !pair.jobId) continue;
+          commit('SET_DETECT_JOB', {
+            ID: pair.jobId,
+            Status: 'queued',
+            Progress: 0,
+            Total: 0,
+            Message: '等待任务开始'
+          });
+        }
+      } catch (_) {}
+    },
+    async subscribeJobs({ commit, dispatch }, jobPairs = []) {
+      // jobPairs: [{ id: imageId, jobId, ok }]
+      const terminal = new Set(['completed','failed','canceled']);
+      for (const pair of (jobPairs || [])) {
+        if (!pair || !pair.ok || !pair.jobId) continue;
+        const jobId = pair.jobId;
+        try {
+          const urls = [
+            `http://localhost:3000/api/detect/jobs/${jobId}/stream`,
+            `http://localhost:3000/api/jobs/${jobId}/stream`
+          ];
+          let es = null;
+          const openStream = (idx) => {
+            if (idx >= urls.length) { dispatch('pollJobUntilDone', { jobId, imageId: pair.id }); return; }
+            try {
+              es = new EventSource(urls[idx]);
+              es.onmessage = (evt) => {
+                try {
+                  const json = JSON.parse(evt.data);
+                  const job = normalizeJob(json) || { ID: jobId, Status: 'running', Progress: 0, Total: 0, Message: '' };
+                  commit('SET_DETECT_JOB', job);
+                  if (job && terminal.has(job.Status)) {
+                    es.close();
+                    if (pair.id) dispatch('fetchDetectionsByImage', { imageId: pair.id });
+                  }
+                } catch (_) {}
+              };
+              es.onerror = () => { try { es.close(); } catch (_) {}; openStream(idx + 1); };
+            } catch (_) { openStream(idx + 1); }
+          };
+          openStream(0);
+        } catch (_) {
+          dispatch('pollJobUntilDone', { jobId, imageId: pair.id });
+        }
+      }
+    },
+    async pollJobUntilDone({ commit, dispatch }, { jobId, imageId }) {
+      const terminal = new Set(['completed','failed','canceled']);
+      const interval = 1200;
+      let timer = null;
+      const run = async () => {
+        try {
+          const resp = await fetch(`http://localhost:3000/api/detect/jobs/${jobId}`);
+          const data = await resp.json();
+          if (resp.ok && data) {
+            const raw = data.job || data;
+            let job = normalizeJob(raw);
+            if (job && !job.ID) job.ID = jobId;
+            if (job) commit('SET_DETECT_JOB', job);
+            if (job && terminal.has(job.Status)) {
+              clearInterval(timer);
+              timer = null;
+              if (imageId) {
+                dispatch('fetchDetectionsByImage', { imageId });
+              }
+            }
+          } else {
+            // 服务器返回错误，停止轮询
+            clearInterval(timer);
+            timer = null;
+          }
+        } catch (_) {
+          clearInterval(timer);
+          timer = null;
+        }
+      };
+      await run();
+      timer = setInterval(run, interval);
+    },
+    async fetchDetectionsByImage({ commit, dispatch }, { imageId }) {
+      if (!imageId) return [];
+      const healthy = await dispatch('checkBackendHealth');
+      if (!healthy) return [];
+      try {
+        const resp = await fetch(`http://localhost:3000/api/images/${imageId}/detections`);
+        const data = await resp.json();
+        if (resp.ok && data && Array.isArray(data.detections)) {
+          commit('SET_DETECTION_RESULTS', data.detections);
+          // 自动显示右侧面板
+          commit('SET_SHOW_RESULTS_PANEL', true);
+          return data.detections;
+        }
+        return [];
+      } catch (e) {
+        return [];
+      }
+    },
+    async cancelDetectJob({ commit, dispatch }, { jobId }) {
+      if (!jobId) return false;
+      try {
+        const resp = await fetch(`http://localhost:3000/api/detect/jobs/${jobId}`, { method: 'DELETE' });
+        if (resp.ok) {
+          commit('REMOVE_DETECT_JOB', jobId);
+          return true;
+        }
+        return false;
+      } catch (e) {
+        return false;
+      }
     }
   },
   modules: {

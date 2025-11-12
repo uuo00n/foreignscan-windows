@@ -6,7 +6,7 @@
         <!-- 使用 TDesign 按钮组件替换原生按钮 -->
         <!-- 说明：后续可在 @click 里绑定筛选或启动逻辑 -->
         <t-space size="small">
-          <t-button type="primary">开始</t-button>
+          <t-button type="primary" @click="startSelectedDetect">开始</t-button>
           <t-button theme="success">合格</t-button>
           <t-button theme="danger">缺陷</t-button>
         </t-space>
@@ -19,6 +19,18 @@
       </div>
       <div class="main-content">
         <ImageViewer />
+        <div class="jobs-panel" v-if="Object.keys(detectJobs || {}).length > 0">
+          <h4 class="jobs-title">识别任务进度</h4>
+          <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
+            <div class="job-row">
+              <div class="job-id">{{ job.ID }}</div>
+              <div class="job-status">{{ job.Status }}</div>
+              <div class="job-message">{{ job.Message }}</div>
+              <t-button size="small" theme="danger" variant="outline" @click="cancelJob(job.ID)" v-if="!['completed','failed','canceled'].includes(job.Status)">取消</t-button>
+            </div>
+            <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
+          </div>
+        </div>
       </div>
       <!-- 右侧检测结果面板：默认隐藏，点击“检测结果”后以动画滑入展示 -->
       <transition name="results-slide">
@@ -65,7 +77,8 @@
 import InspectionList from '@/components/InspectionList.vue';
 import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
-import { mapState } from 'vuex'; // 读取全局状态
+import { mapState } from 'vuex';
+import { MessagePlugin } from 'tdesign-vue-next';
 // 引入 TDesign 图标库中的日历图标
 import { CalendarIcon } from 'tdesign-icons-vue-next';
 
@@ -79,14 +92,81 @@ export default {
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
-    ...mapState(['showResultsPanel'])
+    ...mapState(['showResultsPanel', 'detectJobs'])
   },
   methods: {
     // 跳转到按日期查看检测列表的页面
     goToDateView() {
       // 使用命名路由，便于维护
       this.$router.push({ name: 'dateList' });
+    },
+    async startSelectedDetect() {
+      const healthy = await this.$store.dispatch('checkBackendHealth');
+      if (!healthy) {
+        MessagePlugin.error('后端未连接，无法触发识别');
+        return;
+      }
+      const records = (this.$store.state.inspectionRecords || []).filter(r => r && r.selected);
+      if (!records.length) {
+        MessagePlugin.warning('请先在列表勾选需要识别的图片');
+        return;
+      }
+      const ids = records.map(r => r.id);
+      try {
+        const result = await this.$store.dispatch('startYOLOForSelected', { ids });
+        const total = result.length;
+        if (total === 0) {
+          MessagePlugin.warning('未提交任何识别任务');
+          return;
+        }
+        const ok = result.filter(x => x.ok).length;
+        const fail = total - ok;
+        if (ok > 0 && fail === 0) {
+          MessagePlugin.success(`已提交 ${total} 个识别任务，等待进度更新`);
+        } else if (ok > 0 && fail > 0) {
+          MessagePlugin.warning(`已提交 ${total} 个识别任务，成功 ${ok}，失败 ${fail}`);
+        } else {
+          MessagePlugin.error('提交失败，未成功提交任何识别任务');
+        }
+        if (fail > 0) {
+          console.warn('触发失败详情:', result.filter(x => !x.ok));
+        }
+        const okJobs = result.filter(x => x.ok && x.jobId);
+        if (ok > 0 && okJobs.length === 0) {
+          MessagePlugin.warning('后端未返回任务ID，无法显示进度');
+        }
+        if (okJobs.length > 0) {
+          await this.$store.dispatch('initDetectJobs', okJobs);
+          await this.$store.dispatch('subscribeJobs', okJobs);
+        }
+      } catch (e) {
+        console.error('批量触发失败:', e);
+        MessagePlugin.error('触发失败，请检查后端服务');
+      }
+    },
+    calcProgress(job) {
+      const total = job.Total || 0;
+      const prog = job.Progress || 0;
+      if (!total) return job.Status === 'completed' ? 100 : 0;
+      const pct = Math.floor((prog / total) * 100);
+      return Math.max(0, Math.min(100, pct));
+    },
+    progressStatus(job) {
+      if (job.Status === 'failed') return 'error';
+      if (job.Status === 'canceled') return 'warning';
+      if (job.Status === 'completed') return 'success';
+      return 'active';
+    },
+    async cancelJob(jobId) {
+      const ok = await this.$store.dispatch('cancelDetectJob', { jobId });
+      if (ok) {
+        MessagePlugin.success('任务已取消');
+      } else {
+        MessagePlugin.error('取消任务失败');
+      }
     }
+  },
+  computed: {
   },
   // 移除所有本地模拟数据加载，数据将由组件挂载时通过网络获取
 }
