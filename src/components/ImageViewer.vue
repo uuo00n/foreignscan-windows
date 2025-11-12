@@ -38,6 +38,8 @@
 
 <script>
 import { mapState, mapActions } from 'vuex';
+import apiConfig from '../config/api.json';
+const API_BASE = apiConfig.API_BASE;
 
 // 条件导入 Electron，避免在浏览器环境中报错
 const electron = window.require ? window.require('electron') : null;
@@ -92,7 +94,7 @@ export default {
           // 浏览器环境下，直接调用API
           try {
             // 使用POST方法和正确的API路径
-            const response = await fetch('http://localhost:3000/api/detect', {
+            const response = await fetch(API_BASE + 'api/detect', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'

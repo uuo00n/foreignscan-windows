@@ -1,4 +1,6 @@
 import { createStore } from 'vuex'
+import apiConfig from '../config/api.json';
+const API_BASE = apiConfig.API_BASE;
 
 const normalizeJob = (src) => {
   if (!src) return null;
@@ -46,7 +48,7 @@ export default createStore({
       if (record) {
         // 设置当前图片，按照后端返回规范拼接完整图片 URL
         // 后端数据示例中的 path 为相对路径：uploads/images/{sceneId}/{filename}
-        const baseURL = 'http://localhost:3000/';
+        const baseURL = API_BASE;
         let fullPath = null;
         if (record.path) {
           // 优先使用后端返回的相对路径
@@ -115,7 +117,7 @@ export default createStore({
           return {};
         }
 
-        const response = await fetch('http://localhost:3000/api/scenes');
+        const response = await fetch(API_BASE + 'api/scenes');
         const data = await response.json();
 
         let map = {};
@@ -149,7 +151,7 @@ export default createStore({
     // 健康检查接口
     async checkBackendHealth({ commit }) {
       try {
-        const response = await fetch('http://localhost:3000/ping');
+        const response = await fetch(API_BASE + 'ping');
         if (response.ok) {
           commit('SET_BACKEND_STATUS', 'connected');
           commit('SET_BACKEND_ERROR', null);
@@ -179,7 +181,7 @@ export default createStore({
           return [];
         }
         
-        const response = await fetch('http://localhost:3000/api/images');
+        const response = await fetch(API_BASE + 'api/images');
         const data = await response.json();
         
         if (response.ok && data.images) {
@@ -236,7 +238,7 @@ export default createStore({
 
         // 发起筛选请求：根据后端路由注册，正确路径为 /api/images/filter
         // 说明：后端在 cmd/server/main.go 中通过 api 组注册（api.GET("/images/filter", ...）），实际路径需带上 /api 前缀
-        const url = `http://localhost:3000/api/images/filter?${qs.toString()}`;
+        const url = `${API_BASE}api/images/filter?${qs.toString()}`;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -281,7 +283,7 @@ export default createStore({
       const body = config || {};
       const tasks = ids.map((id) => (async () => {
         try {
-          const resp = await fetch(`http://localhost:3000/api/images/${id}/detect`, {
+          const resp = await fetch(`${API_BASE}api/images/${id}/detect`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
@@ -319,8 +321,8 @@ export default createStore({
         const jobId = pair.jobId;
         try {
           const urls = [
-            `http://localhost:3000/api/detect/jobs/${jobId}/stream`,
-            `http://localhost:3000/api/jobs/${jobId}/stream`
+            `${API_BASE}api/detect/jobs/${jobId}/stream`,
+            `${API_BASE}api/jobs/${jobId}/stream`
           ];
           let es = null;
           const openStream = (idx) => {
@@ -353,7 +355,7 @@ export default createStore({
       let timer = null;
       const run = async () => {
         try {
-          const resp = await fetch(`http://localhost:3000/api/detect/jobs/${jobId}`);
+          const resp = await fetch(`${API_BASE}api/detect/jobs/${jobId}`);
           const data = await resp.json();
           if (resp.ok && data) {
             const raw = data.job || data;
@@ -385,7 +387,7 @@ export default createStore({
       const healthy = await dispatch('checkBackendHealth');
       if (!healthy) return [];
       try {
-        const resp = await fetch(`http://localhost:3000/api/images/${imageId}/detections`);
+        const resp = await fetch(`${API_BASE}api/images/${imageId}/detections`);
         const data = await resp.json();
         if (resp.ok && data && Array.isArray(data.detections)) {
           commit('SET_DETECTION_RESULTS', data.detections);
@@ -401,7 +403,7 @@ export default createStore({
     async cancelDetectJob({ commit, dispatch }, { jobId }) {
       if (!jobId) return false;
       try {
-        const resp = await fetch(`http://localhost:3000/api/detect/jobs/${jobId}`, { method: 'DELETE' });
+        const resp = await fetch(`${API_BASE}api/detect/jobs/${jobId}`, { method: 'DELETE' });
         if (resp.ok) {
           commit('REMOVE_DETECT_JOB', jobId);
           return true;

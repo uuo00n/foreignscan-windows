@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
 const isDevelopment = process.env.NODE_ENV !== 'production';
+// 统一后端地址配置：从前端配置文件读取
+const { API_BASE } = require('../src/config/api.json');
 
 // 保持对window对象的全局引用，避免JavaScript对象被垃圾回收时，窗口被自动关闭
 let mainWindow;
@@ -76,7 +78,7 @@ app.on('activate', () => {
 // 健康检查
 ipcMain.handle('check-health', async () => {
   try {
-    const response = await fetch('http://localhost:3000/ping');
+    const response = await fetch(API_BASE + 'ping');
     return response.ok;
   } catch (error) {
     console.error('健康检查失败:', error);
@@ -87,7 +89,7 @@ ipcMain.handle('check-health', async () => {
 // 获取图片列表
 ipcMain.handle('get-images', async () => {
   try {
-    const response = await fetch('http://localhost:3000/api/images');
+    const response = await fetch(API_BASE + 'api/images');
     if (response.ok) {
       const data = await response.json();
       return data.images || [];
@@ -102,7 +104,7 @@ ipcMain.handle('get-images', async () => {
 // 图片检测
 ipcMain.handle('run-detection', async (event, { imageId }) => {
   try {
-    const response = await fetch('http://localhost:3000/api/detect', {
+    const response = await fetch(API_BASE + 'api/detect', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

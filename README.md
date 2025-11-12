@@ -49,12 +49,10 @@ npm run electron:build
 ```
 
 ## 后端说明（Go）
+- 开发环境默认连接到 `http://localhost:3000`，如需修改后端地址，请编辑 `src/config/api.json` 的 API_BASE 字段（前端与 Electron 主进程统一读取）。
 
 - 当前项目的后端由 Go 实现并独立部署，前端通过 HTTP 与后端交互。
 - README 不再包含具体接口定义；请以后端团队提供的文档为准（包括地址、鉴权与数据格式）。
-- 开发环境默认连接到 `http://localhost:3000`，如需修改后端地址，可在以下文件调整：
-  - `src/store/index.js`（前端网络请求 baseURL）
-  - `electron/main.js`（如有主进程网络相关逻辑）
 
 ## 错误处理
 
@@ -69,7 +67,6 @@ npm run electron:build
 ### 环境地址配置
 
 - 默认后端地址为 `http://localhost:3000`
-- 建议后续将地址外置为环境变量或配置文件，统一管理（如 `.env` 或单独的 `config.ts`），当前版本可直接修改 `src/store/index.js`
 
 ### 调试
 
