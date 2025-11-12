@@ -19,7 +19,7 @@
       </div>
       <div class="main-content">
         <ImageViewer />
-        <div class="jobs-panel" v-if="Object.keys(detectJobs || {}).length > 0">
+        <div class="jobs-panel" v-if="false && Object.keys(detectJobs || {}).length > 0">
           <h4 class="jobs-title">识别任务进度</h4>
           <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
             <div class="job-row">
@@ -38,6 +38,52 @@
           <DetectionResults />
         </div>
       </transition>
+
+      <!-- 识别任务进度弹窗：使用 TDesign Dialog 美化显示 -->
+      <t-dialog
+        v-model:visible="jobsDialogVisible"
+        header="识别任务进度"
+        placement="center"
+        width="720px"
+        destroyOnClose
+        closeOnOverlayClick
+      >
+        <div class="jobs-dialog">
+          <template v-if="Object.keys(detectJobs || {}).length === 0">
+            <t-empty description="暂无正在进行的任务" />
+          </template>
+          <template v-else>
+            <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
+              <div class="job-row">
+                <!-- 任务 ID 与状态标签 -->
+                <t-tag shape="round" theme="default">{{ job.ID }}</t-tag>
+                <t-tag v-if="job.Status==='completed'" theme="success">已完成</t-tag>
+                <t-tag v-else-if="job.Status==='failed'" theme="danger">失败</t-tag>
+                <t-tag v-else-if="job.Status==='canceled'" theme="warning">已取消</t-tag>
+                <t-tag v-else theme="primary">进行中</t-tag>
+                <!-- 后端返回的提示信息 -->
+                <span class="job-message">{{ job.Message }}</span>
+                <!-- 支持取消未完成的任务 -->
+                <t-button
+                  size="small"
+                  theme="danger"
+                  variant="outline"
+                  @click="cancelJob(job.ID)"
+                  v-if="!['completed','failed','canceled'].includes(job.Status)"
+                >取消</t-button>
+              </div>
+              <!-- 进度条：百分比与状态映射来自现有方法 -->
+              <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
+            </div>
+          </template>
+        </div>
+        <template #footer>
+          <t-space>
+            <t-button variant="outline" @click="jobsDialogVisible=false">关闭</t-button>
+          </t-space>
+        </template>
+      </t-dialog>
+
     </main>
     
     <footer class="app-footer">
@@ -83,6 +129,12 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { CalendarIcon } from 'tdesign-icons-vue-next';
 
 export default {
+  data() {
+    return {
+      // 控制识别进度弹窗显示/隐藏
+      jobsDialogVisible: false,
+    };
+  },
   name: 'HomeView',
   components: {
     InspectionList,
@@ -138,6 +190,8 @@ export default {
         if (okJobs.length > 0) {
           await this.$store.dispatch('initDetectJobs', okJobs);
           await this.$store.dispatch('subscribeJobs', okJobs);
+          // 打开弹窗显示任务进度
+          this.jobsDialogVisible = true;
         }
       } catch (e) {
         console.error('批量触发失败:', e);
@@ -305,4 +359,26 @@ body {
   /* 放置于底部栏右侧，避免越界 */
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
+
+/* 识别任务弹窗样式优化 */
+.jobs-dialog {
+  max-height: 60vh; /* 弹窗内部滚动区域，避免过长 */
+  overflow-y: auto;
+}
+.jobs-dialog .job-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.jobs-dialog .job-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap; /* 保证在窄屏下不拥挤 */
+}
+.jobs-dialog .job-message {
+  color: #666;
+  flex: 1;
+  min-width: 160px;
+}
+
 </style>
