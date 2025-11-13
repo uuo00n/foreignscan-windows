@@ -16,13 +16,13 @@
     </div>
     <div class="controls">
       <!-- 操作按钮：使用 TDesign Button -->
-      <!-- 当没有检测结果时不可点击，并显示“未检测”文案 -->
+      <!-- 当当前记录状态为未检测时不可点击，并显示“未检测”文案 -->
       <t-button
         type="primary"
         @click="runDetection"
-        :disabled="!imageSrc || hasBackendError || !(detectionResults && detectionResults.length > 0)"
+        :disabled="!imageSrc || hasBackendError || isUndetected"
       >
-        {{ (detectionResults && detectionResults.length > 0) ? '检测结果' : '未检测' }}
+        {{ isUndetected ? '未检测' : '检测结果' }}
       </t-button>
       <!-- 删除“检测结果”右侧的“导出报告”按钮，保留单一操作以简化界面 -->
     </div>
@@ -41,11 +41,15 @@ const ipcRenderer = electron ? electron.ipcRenderer : null;
 export default {
   name: 'ImageViewer',
   computed: {
-    // 读取当前图片、检测结果以及右侧面板显隐状态
-    ...mapState(['currentImage', 'detectionResults', 'backendStatus', 'showResultsPanel']),
+    // 读取当前图片、当前记录、检测结果以及右侧面板显隐状态
+    ...mapState(['currentImage', 'currentRecord', 'detectionResults', 'backendStatus', 'showResultsPanel']),
     imageSrc() {
       if (!this.currentImage || !this.currentImage.path) return null;
       return this.currentImage.path;
+    },
+    isUndetected() {
+      const s = this.currentRecord && this.currentRecord.status;
+      return s === 'undetected' || s === '未检测';
     },
     hasBackendError() {
       return this.backendStatus === 'error';
