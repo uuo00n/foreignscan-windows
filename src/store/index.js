@@ -163,6 +163,19 @@ export default createStore({
       const next = { ...state.detectJobs };
       delete next[jobId];
       state.detectJobs = next;
+    },
+    UPDATE_RECORD_STATUS(state, { id, status }) {
+      if (!id || !status) return;
+      const list = Array.isArray(state.inspectionRecords) ? state.inspectionRecords : [];
+      state.inspectionRecords = list.map((r) => {
+        if (r && r.id === id) {
+          return { ...r, status };
+        }
+        return r;
+      });
+      if (state.currentRecord && state.currentRecord.id === id) {
+        state.currentRecord = { ...state.currentRecord, status };
+      }
     }
   },
   actions: {
@@ -466,6 +479,8 @@ export default createStore({
           if (Array.isArray(list)) {
             commit('SET_DETECTION_RESULTS', list);
             commit('SET_SHOW_RESULTS_PANEL', true);
+            const nextStatus = list.length > 0 ? 'defect' : 'qualified';
+            commit('UPDATE_RECORD_STATUS', { id: imageId, status: nextStatus });
             return list;
           }
         }
