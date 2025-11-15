@@ -4,9 +4,10 @@
     <!-- 关键：使用 v-model 双向绑定当前标签页 -->
     <t-tabs v-model="activeTab" placement="top">
       <t-tab-panel value="all" label="全部" />
-      <t-tab-panel value="qualified" label="合格" />
-      <t-tab-panel value="defect" label="缺陷" />
+      <t-tab-panel value="detected" label="已检测" />
       <t-tab-panel value="undetected" label="未检测" />
+      <t-tab-panel value="qualified" label="合格" />
+      <t-tab-panel value="exception" label="异常" />
     </t-tabs>
 
     <!-- 后端异常提示：使用 TDesign Alert -->
@@ -89,24 +90,27 @@ export default {
       return this.backendStatus === 'error';
     },
     filteredRecords() {
-      // 兼容后端中文状态与前端英文状态，避免“明明有数据却显示为空”
-      if (this.activeTab === 'all') {
-        return this.inspectionRecords;
+      const records = this.inspectionRecords || [];
+      const tab = this.activeTab;
+      if (tab === 'all') return records;
+      const first = records.length > 0 ? records[0] : null;
+      if (first) {
+        const fDet = first.isDetected === true;
+        const fIssue = first.hasIssue === true;
+        if (tab === 'detected' && fDet) return records;
+        if (tab === 'undetected' && first.isDetected === false) return records;
+        if (tab === 'qualified' && fDet && !fIssue) return records;
+        if (tab === 'exception' && fDet && fIssue) return records;
       }
-      // 映射表：英文标签值 -> [英文, 中文]
-      const map = {
-        qualified: ['qualified', '合格'],
-        defect: ['defect', '缺陷'],
-        undetected: ['undetected', '未检测']
-      };
-      const allow = map[this.activeTab] || [];
-      // 若当前列表已是筛选结果（通过 store.fetchImagesByFilter 返回），直接返回，避免重复过滤导致空列表
-      const first = this.inspectionRecords && this.inspectionRecords.length > 0 ? this.inspectionRecords[0] : null;
-      if (first && allow.includes(first.status)) {
-        return this.inspectionRecords;
-      }
-      // 否则按映射进行过滤（兼容中英文）
-      return (this.inspectionRecords || []).filter(record => allow.includes(record.status));
+      return records.filter(r => {
+        const det = r && r.isDetected === true;
+        const issue = r && r.hasIssue === true;
+        if (tab === 'detected') return det;
+        if (tab === 'undetected') return r && r.isDetected === false;
+        if (tab === 'qualified') return det && !issue;
+        if (tab === 'exception') return det && issue;
+        return true;
+      });
     }
   },
   methods: {
@@ -125,23 +129,16 @@ export default {
       await this.loadByTab();
     },
     getStatusText(status) {
-      switch(status) {
-        case 'qualified': return '合格';
-        case 'defect': return '缺陷';
-        case 'pending': return '待检';
-        case 'undetected': return '未检测';
-        default: return '未知';
-      }
+      if (status === '已检测' || status === '未检测') return status;
+      // 兼容旧值：合格/缺陷 均显示为已检测
+      if (status === '合格' || status === '缺陷' || status === 'qualified' || status === 'defect') return '已检测';
+      return '未知';
     },
     // 根据状态返回 TDesign Tag 的主题颜色
     statusTheme(status) {
-      switch (status) {
-        case 'qualified': return 'success';
-        case 'defect': return 'danger';
-        case 'pending': return 'default';
-        case 'undetected': return 'warning';
-        default: return 'default';
-      }
+      if (status === '未检测' || status === 'undetected') return 'warning';
+      if (status === '已检测' || status === 'qualified' || status === 'defect') return 'success';
+      return 'default';
     },
     // 仅展示场景名：根据 sceneId 查映射，若无映射则使用 record.sceneName/scene，最后回退“未知场景”
     getSceneName(record) {
@@ -175,7 +172,6 @@ export default {
         await this.fetchImagesFromServer();
         return;
       }
-      // 其它标签：调用筛选接口（store 内部完成中英文映射）
       await this.fetchImagesByFilter({ status: this.activeTab });
     }
   },

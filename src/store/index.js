@@ -177,6 +177,26 @@ export default createStore({
         state.currentRecord = { ...state.currentRecord, status };
       }
     }
+    ,
+    UPDATE_RECORD_FLAGS(state, { id, isDetected, hasIssue }) {
+      if (!id) return;
+      const list = Array.isArray(state.inspectionRecords) ? state.inspectionRecords : [];
+      state.inspectionRecords = list.map((r) => {
+        if (r && r.id === id) {
+          const next = { ...r };
+          if (isDetected !== undefined) next.isDetected = !!isDetected;
+          if (hasIssue !== undefined) next.hasIssue = !!hasIssue;
+          return next;
+        }
+        return r;
+      });
+      if (state.currentRecord && state.currentRecord.id === id) {
+        const cur = { ...state.currentRecord };
+        if (isDetected !== undefined) cur.isDetected = !!isDetected;
+        if (hasIssue !== undefined) cur.hasIssue = !!hasIssue;
+        state.currentRecord = cur;
+      }
+    }
   },
   actions: {
     loadInspectionRecords({ commit }, records) {
@@ -277,9 +297,7 @@ export default createStore({
         return [];
       }
     },
-    // 使用 /images/filter 根据状态（以及可选的时间范围）获取筛选后的图片列表
-    // 注意：后端接口期望的 status 为中文："合格" | "缺陷" | "未检测"
-    // 前端 Tabs 使用的英文 key："qualified" | "defect" | "undetected"，需要做一次映射
+    // 使用 /images/filter 根据状态（以及可选的时间范围与 hasIssue）获取筛选后的图片列表
     async fetchImagesByFilter({ commit, dispatch }, { status, start = null, end = null } = {}) {
       try {
         // 后端健康检查：若失败则直接清空并返回
@@ -289,10 +307,9 @@ export default createStore({
           return [];
         }
 
-        // 将英文状态 key 映射为后端需要的中文值
+        // 英文标签到后端中文的映射
         const statusMap = {
-          qualified: '合格',
-          defect: '缺陷',
+          detected: '已检测',
           undetected: '未检测'
         };
         // 如果传入的是中文，则直接使用；否则根据英文 key 转换
@@ -308,8 +325,15 @@ export default createStore({
 
         // 构建查询参数：仅在存在时添加，避免“神秘命名”和冗余参数
         const qs = new URLSearchParams();
-        qs.set('status', statusText);
-        if (start) qs.set('start', start); // 支持 YYYY-MM-DD 或 RFC3339
+        let useFlagsOnly = false;
+        if (status === 'qualified' || status === 'exception') {
+          // 合格/异常基于 isDetected=true 且 hasIssue 精筛
+          qs.set('status', '已检测');
+          qs.set('hasIssue', status === 'exception' ? 'true' : 'false');
+        } else {
+          qs.set('status', statusText);
+        }
+        if (start) qs.set('start', start);
         if (end) qs.set('end', end);
 
         // 发起筛选请求：根据后端路由注册，正确路径为 /api/images/filter
@@ -319,7 +343,6 @@ export default createStore({
         const data = await response.json();
 
         if (response.ok) {
-          // 兼容返回结构：images 或 list
           const images = Array.isArray(data.images) ? data.images : (Array.isArray(data.list) ? data.list : []);
           commit('SET_INSPECTION_RECORDS', images);
           return images;
@@ -475,11 +498,24 @@ export default createStore({
           if (processedUrl) {
             commit('SET_PROCESSED_IMAGE_PATH', API_BASE + (processedUrl.startsWith('/') ? processedUrl.slice(1) : processedUrl));
           }
+          let detArray = [];
+          if (Array.isArray(raw)) {
+            detArray = raw;
+          } else if (raw && Array.isArray(raw.detections)) {
+            detArray = raw.detections;
+          }
+          const isDetectedFlag = detArray.length > 0;
+          let hasIssueFlag = false;
+          for (const d of detArray) {
+            const s = d && d.summary;
+            if (s && s.hasIssue === true) { hasIssueFlag = true; break; }
+          }
           const list = normalizeDetections(raw);
           if (Array.isArray(list)) {
             commit('SET_DETECTION_RESULTS', list);
             commit('SET_SHOW_RESULTS_PANEL', true);
-            const nextStatus = list.length > 0 ? 'defect' : 'qualified';
+            const nextStatus = isDetectedFlag ? '已检测' : '未检测';
+            commit('UPDATE_RECORD_FLAGS', { id: imageId, isDetected: isDetectedFlag, hasIssue: hasIssueFlag });
             commit('UPDATE_RECORD_STATUS', { id: imageId, status: nextStatus });
             return list;
           }
