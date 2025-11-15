@@ -57,6 +57,14 @@
       </div>
     </template>
 
+    <!-- 将选择按钮放在底部导出按钮的上方，视觉更贴近列表操作区域 -->
+    <div class="list-toolbar">
+      <t-space>
+        <t-button theme="primary" @click="selectAllFiltered">全选</t-button>
+        <t-button variant="outline" @click="clearSelectionFiltered">取消</t-button>
+      </t-space>
+    </div>
+
     <!-- 底部操作按钮：使用 TDesign Button -->
     <div class="action-buttons">
       <t-button block type="primary" :disabled="filteredRecords.length === 0 || hasBackendError">导出报告</t-button>
@@ -105,6 +113,12 @@ export default {
     ...mapActions(['setCurrentRecord', 'fetchImagesFromServer', 'fetchSceneNameMap', 'fetchImagesByFilter']),
     selectRecord(record) {
       this.setCurrentRecord(record);
+    },
+    selectAllFiltered() {
+      (this.filteredRecords || []).forEach(r => { if (r) r.selected = true; });
+    },
+    clearSelectionFiltered() {
+      (this.filteredRecords || []).forEach(r => { if (r) r.selected = false; });
     },
     async retryConnection() {
       // 重试时按当前标签重新加载，避免仅请求全部列表
@@ -265,6 +279,13 @@ export default {
 
 .action-buttons {
   padding: 10px;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid #e0e0e0;
+}
+
+.list-toolbar {
+  padding: 8px;
   display: flex;
   justify-content: center;
   border-top: 1px solid #e0e0e0;
