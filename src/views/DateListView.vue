@@ -38,12 +38,13 @@
             <!-- 第一行：主信息（场景名称/ID）与状态标签并列展示，降低拥挤感 -->
             <div class="line-top">
               <div class="record-title">{{ record.sceneId || '未知场景' }}</div>
-              <t-tag :theme="statusTheme(record.status)" variant="light" size="small">
-                {{ getStatusText(record.status) }}
+              <t-tag :theme="statusTheme(record)" variant="light" size="small">
+                {{ getStatusText(record) }}
               </t-tag>
             </div>
             <!-- 第二行：次级信息（日期 + 时间），用较小字号弱化但仍清晰可读 -->
             <div class="line-bottom">
+              <div class="record-scene">场景：{{ getSceneName(record) }}</div>
               <div class="record-subtitle">{{ formatDateValue(record.timestamp) }} {{ formatTime(record.timestamp) }}</div>
             </div>
           </div>
@@ -84,7 +85,7 @@ export default {
     ChevronLeftIcon
   },
   computed: {
-    ...mapState(['inspectionRecords']),
+    ...mapState(['inspectionRecords', 'sceneNameMap']),
     // 根据选中日期过滤记录
     filteredRecords() {
       if (!this.selectedDate) return [];
@@ -131,23 +132,31 @@ export default {
         this.currentPage = 1;
       }
     },
-    getStatusText(status) {
-      switch(status) {
-        case 'qualified': return '合格';
-        case 'defect': return '缺陷';
-        case 'pending': return '待检';
-        case 'undetected': return '未检测';
-        default: return '未知';
-      }
+    getSceneName(record) {
+      if (!record) return '未知场景';
+      const id = record.sceneId != null ? String(record.sceneId) : null;
+      const byMap = id && this.sceneNameMap ? this.sceneNameMap[id] : null;
+      return byMap || record.sceneName || record.scene || (id || '未知场景');
     },
-    statusTheme(status) {
-      switch (status) {
-        case 'qualified': return 'success';
-        case 'defect': return 'danger';
-        case 'pending': return 'default';
-        case 'undetected': return 'warning';
-        default: return 'default';
-      }
+    getStatusText(record) {
+      const det = record && record.isDetected === true;
+      const issue = record && record.hasIssue === true;
+      if (det) return issue ? '缺陷' : '合格';
+      const s = record && record.status;
+      if (s === 'qualified' || s === '合格') return '合格';
+      if (s === 'defect' || s === '缺陷' || s === '异常') return '缺陷';
+      if (s === 'undetected' || s === '未检测') return '未检测';
+      return '未知';
+    },
+    statusTheme(record) {
+      const det = record && record.isDetected === true;
+      const issue = record && record.hasIssue === true;
+      if (det) return issue ? 'danger' : 'success';
+      const s = record && record.status;
+      if (s === 'undetected' || s === '未检测') return 'warning';
+      if (s === 'qualified' || s === '合格') return 'success';
+      if (s === 'defect' || s === '缺陷' || s === '异常') return 'danger';
+      return 'default';
     },
     formatDateValue(ts) {
       // 将时间戳或 ISO 字符串转为 YYYY-MM-DD 字符串
@@ -247,6 +256,11 @@ export default {
   flex-direction: column;
   gap: 4px;
   padding: 6px 0;
+}
+
+.record-scene {
+  font-size: 12px;
+  color: #666;
 }
 
 /* 第一行顶部：主信息与状态标签左右分布 */
