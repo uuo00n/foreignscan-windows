@@ -7,15 +7,15 @@
         <!-- 说明：后续可在 @click 里绑定筛选或启动逻辑 -->
         <t-space size="small">
           <t-button type="primary" @click="startSelectedDetect">开始</t-button>
-          <t-button theme="success">合格</t-button>
-          <t-button theme="danger">缺陷</t-button>
+          <t-button theme="success" @click="filterQualified">合格</t-button>
+          <t-button theme="danger" @click="filterDefect">缺陷</t-button>
         </t-space>
       </div>
     </header>
     
     <main class="app-content">
       <div class="sidebar">
-        <InspectionList />
+        <InspectionList ref="inspectionList" />
       </div>
       <div class="main-content">
         <ImageViewer />
@@ -151,6 +151,14 @@ export default {
     goToDateView() {
       // 使用命名路由，便于维护
       this.$router.push({ name: 'dateList' });
+    },
+    filterQualified() {
+      const ref = this.$refs && this.$refs.inspectionList;
+      if (ref) ref.activeTab = 'qualified';
+    },
+    filterDefect() {
+      const ref = this.$refs && this.$refs.inspectionList;
+      if (ref) ref.activeTab = 'exception';
     },
     async startSelectedDetect() {
       const healthy = await this.$store.dispatch('checkBackendHealth');

@@ -44,8 +44,8 @@
               <!-- 检测时间：保持原有格式化逻辑 -->
               <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
               <!-- 状态标签：使用 TDesign Tag，并根据状态动态主题颜色 -->
-              <t-tag :theme="statusTheme(record.status)" variant="light" size="small">
-                {{ getStatusText(record.status) }}
+              <t-tag :theme="record && record.isDetected === true ? 'success' : (record && record.isDetected === false ? 'warning' : 'default')" variant="light" size="small">
+                {{ record && record.isDetected === true ? '已检测' : '未检测' }}
               </t-tag>
             </div>
           </div>
@@ -128,18 +128,8 @@ export default {
       // 重试时按当前标签重新加载，避免仅请求全部列表
       await this.loadByTab();
     },
-    getStatusText(status) {
-      if (status === '已检测' || status === '未检测') return status;
-      // 兼容旧值：合格/缺陷 均显示为已检测
-      if (status === '合格' || status === '缺陷' || status === 'qualified' || status === 'defect') return '已检测';
-      return '未知';
-    },
-    // 根据状态返回 TDesign Tag 的主题颜色
-    statusTheme(status) {
-      if (status === '未检测' || status === 'undetected') return 'warning';
-      if (status === '已检测' || status === 'qualified' || status === 'defect') return 'success';
-      return 'default';
-    },
+    getStatusText() {},
+    statusTheme() {},
     // 仅展示场景名：根据 sceneId 查映射，若无映射则使用 record.sceneName/scene，最后回退“未知场景”
     getSceneName(record) {
       if (!record) return '未知场景';
