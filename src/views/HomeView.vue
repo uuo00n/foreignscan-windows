@@ -102,9 +102,10 @@
         <template v-else>
           <div class="status-item"><span class="label">全部总数:</span><span class="value">{{ counts.total }}</span></div>
           <div class="status-item"><span class="label">已检测总数:</span><span class="value">{{ counts.detected }}</span></div>
+          <div class="status-item"><span class="label">未检测数量:</span><span class="value">{{ counts.undetected }}</span></div>
           <div class="status-item"><span class="label">合格数量:</span><span class="value">{{ counts.qualified }}</span></div>
           <div class="status-item"><span class="label">缺陷数量:</span><span class="value">{{ counts.defect }}</span></div>
-          <div class="status-item"><span class="label">未检测数量:</span><span class="value">{{ counts.undetected }}</span></div>
+        
         </template>
         <t-button class="progress-btn" variant="outline" size="small" theme="primary" shape="round" @click="openJobsDialog" title="查看识别任务进度">
           任务进度
