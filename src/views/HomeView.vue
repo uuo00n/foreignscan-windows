@@ -88,18 +88,18 @@
     
     <footer class="app-footer">
       <div class="status-info">
-        <div class="status-item">
-          <span class="label">当前状态:</span>
-          <span class="value">已连接</span>
-        </div>
-        <div class="status-item">
-          <span class="label">检测结果:</span>
-          <span class="value">3</span>
-        </div>
-        <div class="status-item">
-          <span class="label">缺陷数量:</span>
-          <span class="value">20</span>
-        </div>
+      <div class="status-item">
+        <span class="label">当前状态:</span>
+        <span class="value">{{ backendStatus === 'connected' ? '已连接' : (backendStatus === 'error' ? '异常' : '未连接') }}</span>
+      </div>
+      <div class="status-item">
+        <span class="label">检测结果:</span>
+        <span class="value">{{ (detectionResults || []).length }}</span>
+      </div>
+      <div class="status-item">
+        <span class="label">缺陷数量:</span>
+        <span class="value">{{ defectCount }}</span>
+      </div>
       </div>
       <!-- 底部右侧的操作区域：放置日期跳转按钮 -->
       <div class="footer-action">
@@ -144,7 +144,11 @@ export default {
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
-    ...mapState(['showResultsPanel', 'detectJobs'])
+    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords']),
+    defectCount() {
+      const list = this.inspectionRecords || [];
+      return list.filter(r => r && r.hasIssue === true).length;
+    }
   },
   methods: {
     // 跳转到按日期查看检测列表的页面
