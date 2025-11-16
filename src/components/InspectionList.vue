@@ -184,6 +184,7 @@ export default {
   async mounted() {
     // 首次进入：根据当前标签加载数据
     await this.loadByTab();
+    try { await this.$store.dispatch('setListActiveTab', this.activeTab); } catch (_) {}
     // 并行获取场景名称映射（若后端支持），用于将 sceneId 显示为中文名称
     try {
       await this.fetchSceneNameMap();
@@ -203,6 +204,7 @@ export default {
       immediate: false,
       async handler() {
         await this.loadByTab();
+        try { await this.$store.dispatch('setListActiveTab', this.activeTab); } catch (_) {}
         // 切换标签后，如有数据默认选中第一条（优先选当前过滤后的第一条）
         const first = (this.filteredRecords && this.filteredRecords[0]) || (this.inspectionRecords && this.inspectionRecords[0]) || null;
         if (first) {

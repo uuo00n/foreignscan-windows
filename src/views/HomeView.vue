@@ -7,8 +7,11 @@
         <!-- 说明：后续可在 @click 里绑定筛选或启动逻辑 -->
         <t-space size="small">
           <t-button type="primary" @click="startSelectedDetect">开始</t-button>
-          <t-button theme="success" @click="filterQualified">合格</t-button>
-          <t-button theme="danger" @click="filterDefect">缺陷</t-button>
+          <t-button theme="success">合格</t-button>
+          <t-button theme="danger">缺陷</t-button>
+          <t-button shape="circle" theme="primary" @click="refreshList" title="刷新列表">
+            <RefreshIcon size="16" />
+          </t-button>
         </t-space>
       </div>
     </header>
@@ -52,30 +55,30 @@
           <template v-if="Object.keys(detectJobs || {}).length === 0">
             <t-empty description="暂无正在进行的任务" />
           </template>
-          <template v-else>
-            <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
-              <div class="job-row">
-                <!-- 任务 ID 与状态标签 -->
-                <t-tag shape="round" theme="default">{{ job.ID }}</t-tag>
-                <t-tag v-if="job.Status==='completed'" theme="success">已完成</t-tag>
-                <t-tag v-else-if="job.Status==='failed'" theme="danger">失败</t-tag>
-                <t-tag v-else-if="job.Status==='canceled'" theme="warning">已取消</t-tag>
-                <t-tag v-else theme="primary">进行中</t-tag>
-                <!-- 后端返回的提示信息 -->
-                <span class="job-message">{{ job.Message }}</span>
-                <!-- 支持取消未完成的任务 -->
-                <t-button
-                  size="small"
-                  theme="danger"
-                  variant="outline"
-                  @click="cancelJob(job.ID)"
-                  v-if="!['completed','failed','canceled'].includes(job.Status)"
-                >取消</t-button>
-              </div>
-              <!-- 进度条：百分比与状态映射来自现有方法 -->
-              <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
+        <template v-else>
+          <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
+            <div class="job-row">
+              <!-- 任务 ID 与状态标签 -->
+              <t-tag shape="round" theme="default">{{ job.ID }}</t-tag>
+              <t-tag v-if="job.Status==='completed'" theme="success">已完成</t-tag>
+              <t-tag v-else-if="job.Status==='failed'" theme="danger">失败</t-tag>
+              <t-tag v-else-if="job.Status==='canceled'" theme="warning">已取消</t-tag>
+              <t-tag v-else theme="primary">进行中</t-tag>
+              <!-- 后端返回的提示信息 -->
+              <span class="job-message">{{ job.Message }}</span>
+              <!-- 支持取消未完成的任务 -->
+              <t-button
+                size="small"
+                theme="danger"
+                variant="outline"
+                @click="cancelJob(job.ID)"
+                v-if="!['completed','failed','canceled'].includes(job.Status)"
+              >取消</t-button>
             </div>
-          </template>
+            <!-- 进度条：百分比与状态映射来自现有方法 -->
+            <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
+          </div>
+        </template>
         </div>
         <template #footer>
           <t-space>
@@ -88,18 +91,24 @@
     
     <footer class="app-footer">
       <div class="status-info">
-      <div class="status-item">
-        <span class="label">当前状态:</span>
-        <span class="value">{{ backendStatus === 'connected' ? '已连接' : (backendStatus === 'error' ? '异常' : '未连接') }}</span>
-      </div>
-      <div class="status-item">
-        <span class="label">检测结果:</span>
-        <span class="value">{{ (detectionResults || []).length }}</span>
-      </div>
-      <div class="status-item">
-        <span class="label">缺陷数量:</span>
-        <span class="value">{{ defectCount }}</span>
-      </div>
+        <template v-if="listActiveTab==='undetected'">
+          <div class="status-item"><span class="label">未检测数量:</span><span class="value">{{ counts.undetected }}</span></div>
+        </template>
+        <template v-else-if="listActiveTab==='detected'">
+          <div class="status-item"><span class="label">已检测总数:</span><span class="value">{{ counts.detected }}</span></div>
+          <div class="status-item"><span class="label">合格数量:</span><span class="value">{{ counts.qualified }}</span></div>
+          <div class="status-item"><span class="label">缺陷数量:</span><span class="value">{{ counts.defect }}</span></div>
+        </template>
+        <template v-else>
+          <div class="status-item"><span class="label">全部总数:</span><span class="value">{{ counts.total }}</span></div>
+          <div class="status-item"><span class="label">已检测总数:</span><span class="value">{{ counts.detected }}</span></div>
+          <div class="status-item"><span class="label">合格数量:</span><span class="value">{{ counts.qualified }}</span></div>
+          <div class="status-item"><span class="label">缺陷数量:</span><span class="value">{{ counts.defect }}</span></div>
+          <div class="status-item"><span class="label">未检测数量:</span><span class="value">{{ counts.undetected }}</span></div>
+        </template>
+        <t-button class="progress-btn" variant="outline" size="small" theme="primary" shape="round" @click="openJobsDialog" title="查看识别任务进度">
+          任务进度
+        </t-button>
       </div>
       <!-- 底部右侧的操作区域：放置日期跳转按钮 -->
       <div class="footer-action">
@@ -126,7 +135,7 @@ import DetectionResults from '@/components/DetectionResults.vue';
 import { mapState } from 'vuex';
 import { MessagePlugin } from 'tdesign-vue-next';
 // 引入 TDesign 图标库中的日历图标
-import { CalendarIcon } from 'tdesign-icons-vue-next';
+import { CalendarIcon, RefreshIcon } from 'tdesign-icons-vue-next';
 
 export default {
   data() {
@@ -140,14 +149,37 @@ export default {
     InspectionList,
     ImageViewer,
     DetectionResults,
-    CalendarIcon
+    CalendarIcon,
+    RefreshIcon
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
-    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords']),
-    defectCount() {
-      const list = this.inspectionRecords || [];
-      return list.filter(r => r && r.hasIssue === true).length;
+    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords', 'listActiveTab']),
+    counts() {
+      const list = Array.isArray(this.inspectionRecords) ? this.inspectionRecords : [];
+      const statusKey = (s) => {
+        if (s === 'qualified' || s === '合格') return 'qualified';
+        if (s === 'defect' || s === '缺陷' || s === '异常') return 'defect';
+        if (s === 'undetected' || s === '未检测') return 'undetected';
+        if (s === '已检测') return 'detected';
+        return 'unknown';
+      };
+      let qualified = 0, defect = 0, undetected = 0;
+      for (const r of list) {
+        const detFlag = r && r.isDetected === true;
+        const issueFlag = r && r.hasIssue === true;
+        if (detFlag) {
+          if (issueFlag) defect++; else qualified++;
+          continue;
+        }
+        const k = statusKey(r && r.status);
+        if (k === 'qualified') qualified++;
+        else if (k === 'defect') defect++;
+        else if (k === 'undetected') undetected++;
+      }
+      const detected = qualified + defect;
+      const total = list.length;
+      return { total, detected, qualified, defect, undetected };
     }
   },
   methods: {
@@ -156,13 +188,21 @@ export default {
       // 使用命名路由，便于维护
       this.$router.push({ name: 'dateList' });
     },
-    filterQualified() {
-      const ref = this.$refs && this.$refs.inspectionList;
-      if (ref) ref.activeTab = 'qualified';
-    },
-    filterDefect() {
-      const ref = this.$refs && this.$refs.inspectionList;
-      if (ref) ref.activeTab = 'exception';
+    refreshList() {
+      const tab = this.$store.state.listActiveTab || 'all';
+      if (tab === 'all') {
+        this.$store.dispatch('fetchImagesFromServer');
+        return;
+      }
+      if (tab === 'undetected') {
+        this.$store.dispatch('fetchImagesByFilter', { status: 'undetected' });
+        return;
+      }
+      if (tab === 'detected') {
+        this.$store.dispatch('fetchImagesFromServer');
+        return;
+      }
+      this.$store.dispatch('fetchImagesFromServer');
     },
     async startSelectedDetect() {
       const healthy = await this.$store.dispatch('checkBackendHealth');
@@ -230,6 +270,9 @@ export default {
       } else {
         MessagePlugin.error('取消任务失败');
       }
+    },
+    openJobsDialog() {
+      this.jobsDialogVisible = true;
     }
   },
   // 移除所有本地模拟数据加载，数据将由组件挂载时通过网络获取

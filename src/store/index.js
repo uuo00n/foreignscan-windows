@@ -93,7 +93,8 @@ export default createStore({
     backendStatus: 'unknown', // 'connected', 'error'
     backendError: null,
     // 任务状态：jobId -> job
-    detectJobs: {}
+    detectJobs: {},
+    listActiveTab: 'all'
   },
   getters: {
     hasBackendError: state => state.backendStatus === 'error'
@@ -196,6 +197,9 @@ export default createStore({
         if (hasIssue !== undefined) cur.hasIssue = !!hasIssue;
         state.currentRecord = cur;
       }
+    },
+    SET_LIST_ACTIVE_TAB(state, tab) {
+      state.listActiveTab = tab || 'all';
     }
   },
   actions: {
@@ -537,6 +541,9 @@ export default createStore({
       } catch (e) {
         return false;
       }
+    },
+    setListActiveTab({ commit }, tab) {
+      commit('SET_LIST_ACTIVE_TAB', tab);
     }
   },
   modules: {
