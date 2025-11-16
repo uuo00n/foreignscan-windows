@@ -6,9 +6,15 @@
       <t-tab-panel value="all" label="全部" />
       <t-tab-panel value="detected" label="已检测" />
       <t-tab-panel value="undetected" label="未检测" />
-      <t-tab-panel value="qualified" label="合格" />
-      <t-tab-panel value="exception" label="异常" />
     </t-tabs>
+
+    <div v-if="activeTab==='detected'" class="detected-filter">
+      <t-select v-model="detectedFilter" style="width: 160px" placeholder="选择类型">
+        <t-option value="all" label="全部" />
+        <t-option value="qualified" label="合格" />
+        <t-option value="exception" label="异常" />
+      </t-select>
+    </div>
 
     <!-- 后端异常提示：使用 TDesign Alert -->
     <t-alert
@@ -43,9 +49,9 @@
               <div class="record-date">检测日期：{{ safeDateText(record) }}</div>
               <!-- 检测时间：保持原有格式化逻辑 -->
               <div class="record-time">检测时间：{{ record.time || formatTime(record.timestamp) }}</div>
-              <!-- 状态标签：使用 TDesign Tag，并根据状态动态主题颜色 -->
-              <t-tag :theme="record && record.isDetected === true ? 'success' : (record && record.isDetected === false ? 'warning' : 'default')" variant="light" size="small">
-                {{ record && record.isDetected === true ? '已检测' : '未检测' }}
+              <!-- 状态标签：在“已检测”页显示 合格/异常；其它页保持语义合理展示 -->
+              <t-tag :theme="statusTheme(record)" variant="light" size="small">
+                {{ statusText(record) }}
               </t-tag>
             </div>
           </div>
@@ -80,7 +86,8 @@ export default {
   name: 'InspectionList',
   data() {
     return {
-      activeTab: 'all'
+      activeTab: 'all',
+      detectedFilter: 'all'
     };
   },
   computed: {
@@ -93,24 +100,13 @@ export default {
       const records = this.inspectionRecords || [];
       const tab = this.activeTab;
       if (tab === 'all') return records;
-      const first = records.length > 0 ? records[0] : null;
-      if (first) {
-        const fDet = first.isDetected === true;
-        const fIssue = first.hasIssue === true;
-        if (tab === 'detected' && fDet) return records;
-        if (tab === 'undetected' && first.isDetected === false) return records;
-        if (tab === 'qualified' && fDet && !fIssue) return records;
-        if (tab === 'exception' && fDet && fIssue) return records;
+      if (tab === 'undetected') return records.filter(r => r && r.isDetected === false);
+      if (tab === 'detected') {
+        if (this.detectedFilter === 'qualified') return records.filter(r => r && r.isDetected === true && r.hasIssue !== true);
+        if (this.detectedFilter === 'exception') return records.filter(r => r && r.isDetected === true && r.hasIssue === true);
+        return records.filter(r => r && r.isDetected === true);
       }
-      return records.filter(r => {
-        const det = r && r.isDetected === true;
-        const issue = r && r.hasIssue === true;
-        if (tab === 'detected') return det;
-        if (tab === 'undetected') return r && r.isDetected === false;
-        if (tab === 'qualified') return det && !issue;
-        if (tab === 'exception') return det && issue;
-        return true;
-      });
+      return records;
     }
   },
   methods: {
@@ -130,6 +126,20 @@ export default {
     },
     getStatusText() {},
     statusTheme() {},
+    statusText(record) {
+      const det = record && record.isDetected === true;
+      const issue = record && record.hasIssue === true;
+      if (this.activeTab === 'detected') return issue ? '异常' : '合格';
+      if (this.activeTab === 'undetected') return '未检测';
+      return det ? (issue ? '异常' : '合格') : '未检测';
+    },
+    statusTheme(record) {
+      const det = record && record.isDetected === true;
+      const issue = record && record.hasIssue === true;
+      if (this.activeTab === 'undetected') return 'warning';
+      if (det) return issue ? 'danger' : 'success';
+      return 'default';
+    },
     // 仅展示场景名：根据 sceneId 查映射，若无映射则使用 record.sceneName/scene，最后回退“未知场景”
     getSceneName(record) {
       if (!record) return '未知场景';
@@ -157,12 +167,18 @@ export default {
     // - 全部：沿用旧接口获取所有图片
     // - 其余状态：改用 /images/filter 接口按状态获取
     async loadByTab() {
-      // 关键节点：减少分支嵌套，提前返回
       if (this.activeTab === 'all') {
         await this.fetchImagesFromServer();
         return;
       }
-      await this.fetchImagesByFilter({ status: this.activeTab });
+      if (this.activeTab === 'undetected') {
+        await this.fetchImagesByFilter({ status: 'undetected' });
+        return;
+      }
+      if (this.activeTab === 'detected') {
+        await this.fetchImagesFromServer();
+        return;
+      }
     }
   },
   async mounted() {
@@ -191,6 +207,17 @@ export default {
         const first = (this.filteredRecords && this.filteredRecords[0]) || (this.inspectionRecords && this.inspectionRecords[0]) || null;
         if (first) {
           this.selectRecord(first);
+        }
+      }
+    }
+    ,
+    detectedFilter: {
+      immediate: false,
+      async handler() {
+        if (this.activeTab === 'detected') {
+          // 仅前端过滤，无需额外请求
+          const first = (this.filteredRecords && this.filteredRecords[0]) || (this.inspectionRecords && this.inspectionRecords[0]) || null;
+          if (first) this.selectRecord(first);
         }
       }
     }
@@ -275,5 +302,9 @@ export default {
   display: flex;
   justify-content: center;
   border-top: 1px solid #e0e0e0;
+}
+
+.detected-filter {
+  padding: 8px 12px;
 }
 </style>
