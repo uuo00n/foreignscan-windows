@@ -557,8 +557,63 @@ export default createStore({
           if (Array.isArray(list)) {
             commit('SET_DETECTION_RESULTS', list);
             commit('SET_SHOW_RESULTS_PANEL', true);
+            
+            // 优化合格/异常判定逻辑：
+            // 1. 找到最新的一次检测时间（根据 updatedAt/timestamp 等字段）
+            // 2. 检查该时间点的所有检测结果中是否存在异常（hasIssue）
+            // 3. 如果最新一次检测结果均无异常（例如全是 Bolts），则标记为合格（hasIssue = false）
+            
+            // 辅助函数：提取时间戳数值
+            const getTimeVal = (item) => {
+              const t = item.updatedAt || item.timestamp || item.time || item.CreatedAt || item.UpdatedAt || item.created_at || item.updated_at || item._fallbackTime;
+              if (!t) return 0;
+              return new Date(t).getTime();
+            };
+
+            // 找到最新的时间戳
+            let maxTime = 0;
+            list.forEach(item => {
+              const t = getTimeVal(item);
+              if (t > maxTime) maxTime = t;
+            });
+
+            // 如果没有时间戳信息，默认使用原来的 hasIssueFlag
+            // 如果有时间戳，筛选出最新的一批结果进行判断
+            let finalHasIssue = hasIssueFlag;
+            if (maxTime > 0) {
+              // 筛选出属于最新这一批的检测结果（允许 1秒内的误差，防止微小时间差）
+              const latestItems = list.filter(item => Math.abs(getTimeVal(item) - maxTime) < 1000);
+              
+              if (latestItems.length > 0) {
+                // 重新判断这些项是否有异常
+                // 异常判定规则：类型包含 'hole' 或 confidence >= 0.8 (且不是 bolts) 等
+                // 这里复用 DetectionResults 组件里的逻辑思路：
+                // Bolts -> 合格, hole -> 异常/复检
+                let foundIssue = false;
+                for (const item of latestItems) {
+                  const type = String(item.type || '').toLowerCase();
+                  if (type.includes('hole')) {
+                    foundIssue = true;
+                    break;
+                  }
+                  // 如果既不是 bolts 也不是 hole，按置信度兜底？
+                  // 用户需求："当最新的检测结果时间戳内没有含有异常，标记为合格"
+                  // 这里的“异常”通常指 'hole' 或者高风险项。
+                  // 如果是 Bolts，不算异常。
+                  if (!type.includes('bolts') && !type.includes('hole')) {
+                    // 其他类型，保留原有置信度判断或默认视为潜在异常
+                    if ((item.confidence || 0) >= 0.8) {
+                      foundIssue = true;
+                      break;
+                    }
+                  }
+                }
+                finalHasIssue = foundIssue;
+              }
+            }
+
             const nextStatus = isDetectedFlag ? '已检测' : '未检测';
-            commit('UPDATE_RECORD_FLAGS', { id: imageId, isDetected: isDetectedFlag, hasIssue: hasIssueFlag });
+            commit('UPDATE_RECORD_FLAGS', { id: imageId, isDetected: isDetectedFlag, hasIssue: finalHasIssue });
             commit('UPDATE_RECORD_STATUS', { id: imageId, status: nextStatus });
             return list;
           }

@@ -220,15 +220,28 @@ export default {
       }
 
       let ids = [];
-      if (this.isBatchMode && this.$store.getters.batchSelectedIds && this.$store.getters.batchSelectedIds.length > 0) {
-        ids = this.$store.getters.batchSelectedIds;
+      if (this.isBatchMode) {
+        // 批量模式：优先使用批量选中的ID
+        if (this.$store.getters.batchSelectedIds && this.$store.getters.batchSelectedIds.length > 0) {
+          ids = this.$store.getters.batchSelectedIds;
+        } else {
+          // 批量模式但没选中：提示用户
+          MessagePlugin.warning('批量模式下请先选择图片');
+          return;
+        }
       } else {
-        const records = (this.$store.state.inspectionRecords || []).filter(r => r && r.selected);
-        ids = records.map(r => r.id);
+        // 非批量模式：直接检测当前查看的图片
+        const current = this.$store.state.currentRecord;
+        if (current && current.id) {
+          ids = [current.id];
+        } else {
+          MessagePlugin.warning('请先选择一张图片查看');
+          return;
+        }
       }
 
       if (!ids.length) {
-        MessagePlugin.warning('请先选择需要识别的图片');
+        MessagePlugin.warning('未找到可检测的图片');
         return;
       }
 

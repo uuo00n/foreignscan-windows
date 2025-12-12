@@ -1,5 +1,24 @@
 <template>
   <div class="image-viewer">
+    <!-- 图片信息头部 -->
+    <div class="viewer-header" v-if="currentRecord">
+      <div class="header-left">
+        <t-tag theme="primary" variant="light" class="scene-tag">{{ sceneName }}</t-tag>
+        <span class="filename" :title="currentRecord.filename || currentRecord.id">
+          {{ currentRecord.filename || currentRecord.id }}
+        </span>
+      </div>
+      <div class="header-right">
+        <t-tag v-if="currentRecord.status" :theme="statusTheme" variant="outline" size="small" style="margin-right: 12px;">
+          {{ statusText }}
+        </t-tag>
+        <div class="time-info">
+          <span class="label">上传时间：</span>
+          <span class="value">{{ formattedTime }}</span>
+        </div>
+      </div>
+    </div>
+
     <div class="image-container">
       <!-- 内层舞台区域：在图片显示部分添加适当的内边距，以增加留白 -->
       <div class="image-stage">
@@ -42,7 +61,7 @@ export default {
   name: 'ImageViewer',
   computed: {
     // 读取当前图片、当前记录、检测结果以及右侧面板显隐状态
-    ...mapState(['currentImage', 'currentRecord', 'detectionResults', 'backendStatus', 'showResultsPanel']),
+    ...mapState(['currentImage', 'currentRecord', 'detectionResults', 'backendStatus', 'showResultsPanel', 'sceneNameMap']),
     imageSrc() {
       if (!this.currentImage || !this.currentImage.path) return null;
       return this.currentImage.path;
@@ -53,6 +72,39 @@ export default {
     },
     hasBackendError() {
       return this.backendStatus === 'error';
+    },
+    sceneName() {
+      if (!this.currentRecord) return '未知场景';
+      const id = String(this.currentRecord.sceneId);
+      return this.sceneNameMap[id] || id || '未知场景';
+    },
+    formattedTime() {
+      if (!this.currentRecord) return '--';
+      const ts = this.currentRecord.timestamp || this.currentRecord.time || this.currentRecord.createdAt;
+      if (!ts) return '--';
+      const d = new Date(String(ts).length === 10 ? ts * 1000 : ts);
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleString();
+    },
+    statusText() {
+      const s = this.currentRecord && this.currentRecord.status;
+      const map = {
+        'qualified': '合格',
+        'defect': '异常',
+        'exception': '异常',
+        'undetected': '未检测',
+        'detected': '已检测',
+        '已检测': '已检测',
+        '未检测': '未检测'
+      };
+      return map[s] || s || '未知状态';
+    },
+    statusTheme() {
+      const s = this.currentRecord && this.currentRecord.status;
+      if (s === 'qualified' || s === '合格') return 'success';
+      if (s === 'defect' || s === 'exception' || s === '缺陷' || s === '异常') return 'danger';
+      if (s === 'undetected' || s === '未检测') return 'default';
+      return 'primary';
     }
   },
   methods: {
@@ -100,56 +152,100 @@ export default {
 
 <style scoped>
 .image-viewer {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  background-color: #f0f2f5;
   height: 100%;
+  overflow: hidden;
+}
+
+.viewer-header {
+  height: 56px;
+  padding: 0 24px;
+  background-color: #fff;
+  border-bottom: 1px solid #e7e7e7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.scene-tag {
+  flex-shrink: 0;
+}
+
+.filename {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.time-info {
+  font-size: 13px;
+  color: #666;
+  display: flex;
+  align-items: center;
+}
+
+.time-info .value {
+  color: #333;
+  font-weight: 500;
+  margin-left: 4px;
 }
 
 .image-container {
   flex: 1;
-  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #f0f0f0;
+  padding: 20px;
   overflow: hidden;
+  position: relative;
 }
 
-/* 舞台区域：在图片显示部分设置内边距，确保图片与容器边缘有合理留白 */
 .image-stage {
-  position: relative;              /* 作为标记层的定位参考 */
   width: 100%;
   height: 100%;
-  box-sizing: border-box;         /* 让 padding 不影响计算宽高 */
-  padding: 12px;                  /* 适度留白，可按需调整（如 8px/16px） */
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  position: relative;
 }
 
-.image-container img {
+.image-stage img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
 
-.no-image {
-  color: #999;
-  font-size: 16px;
-}
-
-.detection-markers .marker {
-  position: absolute;
-  border: 2px solid #0052d9; /* 移除红色块，仅保留边框（TDesign 主色） */
-  background: transparent;    /* 不再覆盖图片内容，避免“红一块” */
-  pointer-events: none;
-}
-
 .controls {
+  padding: 16px;
   display: flex;
   justify-content: center;
-  padding: 10px;
-  gap: 10px;
-  background-color: #f5f5f5;
+  background-color: #fff;
+  border-top: 1px solid #e7e7e7;
+  flex-shrink: 0;
 }
 </style>
