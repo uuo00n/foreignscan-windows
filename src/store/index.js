@@ -24,6 +24,12 @@ const normalizeJob = (src) => {
 
 // 统一检测结果字段：兼容后端不同命名/结构（含 detections[].items）
 const normalizeDetections = (raw) => {
+  // 尝试提取顶层公共时间字段（仅当 raw 为非数组对象时）
+  let commonTime = null;
+  if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+    commonTime = raw.updatedAt || raw.timestamp || raw.time || raw.CreatedAt || raw.UpdatedAt || raw.created_at || raw.updated_at || null;
+  }
+
   // 解析顶层列表：可能为数组或对象属性
   let top = [];
   try {
@@ -46,15 +52,20 @@ const normalizeDetections = (raw) => {
   // 展平 detections[].items 结构为基础项列表
   const baseItems = [];
   for (const det of (top || [])) {
+    // 如果 top 是数组，且每个元素有 detections/items 字段，可能需要进一步解包
+    // 但根据之前逻辑，这里主要处理 detections[i].items
+    // 同时也尝试从 det 这一层提取时间（如果是数组结构，det 就是顶层项）
+    const detTime = det.updatedAt || det.timestamp || det.time || det.CreatedAt || det.UpdatedAt || det.created_at || det.updated_at || commonTime;
+    
     if (det && Array.isArray(det.items) && det.items.length > 0) {
       for (const it of det.items) {
-        baseItems.push({ ...it });
+        baseItems.push({ ...it, _fallbackTime: detTime });
       }
     } else {
-      baseItems.push(det);
+      baseItems.push({ ...det, _fallbackTime: detTime });
     }
   }
-  // 统一为 { x, y, width, height, type, confidence }
+  // 统一为 { x, y, width, height, type, confidence, updatedAt }
   return baseItems.map((i) => {
     const bbox = i && i.bbox;
     let x = 0, y = 0, width = 0, height = 0;
@@ -75,7 +86,11 @@ const normalizeDetections = (raw) => {
     height = Math.max(0, Number(height) || 0);
     x = Math.max(0, Number(x) || 0);
     y = Math.max(0, Number(y) || 0);
-    return { x, y, width, height, type, confidence };
+
+    // 优先使用 item 自身的时间，其次使用继承的时间
+    const updatedAt = i.updatedAt || i.timestamp || i.time || i.CreatedAt || i.UpdatedAt || i.created_at || i.updated_at || i._fallbackTime || null;
+
+    return { x, y, width, height, type, confidence, updatedAt };
   });
 };
 
