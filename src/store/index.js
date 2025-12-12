@@ -343,8 +343,8 @@ export default createStore({
         return [];
       }
     },
-    // 使用 /images/filter 根据状态（以及可选的时间范围与 hasIssue）获取筛选后的图片列表
-    async fetchImagesByFilter({ commit, dispatch }, { status, start = null, end = null } = {}) {
+    // 使用 /images/filter 根据状态（以及可选的时间范围、场景ID与 hasIssue）获取筛选后的图片列表
+    async fetchImagesByFilter({ commit, dispatch }, { status, start = null, end = null, sceneId = null } = {}) {
       try {
         // 后端健康检查：若失败则直接清空并返回
         const isHealthy = await dispatch('checkBackendHealth');
@@ -363,27 +363,29 @@ export default createStore({
         if (status && typeof status === 'string') {
           statusText = statusMap[status] || status; // 允许直接传中文
         }
-
-        // 若未指定状态或选择“全部”，回退到获取所有图片列表
-        if (!statusText || statusText === '全部' || status === 'all') {
-          return await dispatch('fetchImagesFromServer');
+        
+        // 如果 status 为 'all' 或 '全部'，则传空字符串给后端，后端会自动忽略 status 过滤
+        if (statusText === '全部' || status === 'all') {
+          statusText = '';
         }
 
-        // 构建查询参数：仅在存在时添加，避免“神秘命名”和冗余参数
+        // 构建查询参数
         const qs = new URLSearchParams();
-        let useFlagsOnly = false;
-        if (status === 'qualified' || status === 'exception') {
-          // 合格/异常基于 isDetected=true 且 hasIssue 精筛
-          qs.set('status', '已检测');
-          qs.set('hasIssue', status === 'exception' ? 'true' : 'false');
-        } else {
-          qs.set('status', statusText);
+        if (statusText) {
+          if (status === 'qualified' || status === 'exception') {
+            // 合格/异常基于 isDetected=true 且 hasIssue 精筛
+            qs.set('status', '已检测');
+            qs.set('hasIssue', status === 'exception' ? 'true' : 'false');
+          } else {
+            qs.set('status', statusText);
+          }
         }
+        
         if (start) qs.set('start', start);
         if (end) qs.set('end', end);
+        if (sceneId) qs.set('sceneId', sceneId);
 
         // 发起筛选请求：根据后端路由注册，正确路径为 /api/images/filter
-        // 说明：后端在 cmd/server/main.go 中通过 api 组注册（api.GET("/images/filter", ...）），实际路径需带上 /api 前缀
         const url = `${API_BASE}api/images/filter?${qs.toString()}`;
         const response = await fetch(url);
         const data = await response.json();
