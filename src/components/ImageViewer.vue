@@ -4,8 +4,8 @@
     <div class="viewer-header" v-if="currentRecord">
       <div class="header-left">
         <t-tag theme="primary" variant="light" class="scene-tag">{{ sceneName }}</t-tag>
-        <span class="filename" :title="currentRecord.filename || currentRecord.id">
-          {{ currentRecord.filename || currentRecord.id }}
+        <span class="filename" :title="currentRecord.id">
+          {{ currentRecord.id }}
         </span>
       </div>
       <div class="header-right">
