@@ -13,36 +13,46 @@
       </div>
 
       <!-- 结果列表 -->
-      <div v-if="detectionResults.length > 0" class="results-content">
+      <div v-if="groupedResults.length > 0" class="results-content">
         <t-list :split="false">
-          <t-list-item v-for="(result, index) in detectionResults" :key="index" class="custom-list-item">
-            <div class="result-card">
-              <!-- 左侧图标 -->
-              <div class="result-icon-wrapper" :class="result.confidence >= 0.8 ? 'high-risk' : 'warning'">
-                <ErrorCircleIcon v-if="result.confidence >= 0.8" size="20px" />
-                <InfoCircleIcon v-else size="20px" />
-              </div>
-              
-              <!-- 中间信息 -->
-              <div class="result-info">
-                <div class="result-header">
-                  <span class="result-type">{{ result.type }}</span>
-                </div>
-                <!-- 补充显示检测记录的元数据，例如识别时间 -->
-                <div class="result-meta" v-if="result.updatedAt || result.timestamp || result.time">
-                  <TimeIcon size="12px" style="margin-right: 4px;" />
-                  {{ formatTime(result.updatedAt || result.timestamp || result.time) }}
-                </div>
-              </div>
-
-              <!-- 右侧标签 -->
-              <div class="result-status">
-                <t-tag :theme="result.confidence >= 0.8 ? 'danger' : 'warning'" variant="outline" size="small">
-                  {{ result.confidence >= 0.8 ? '高风险' : '需复检' }}
-                </t-tag>
-              </div>
+          <!-- 遍历分组后的数据 -->
+          <div v-for="(group, gIndex) in groupedResults" :key="gIndex" class="result-group">
+            <!-- 分组时间标题 -->
+            <div class="group-header" v-if="group.time">
+              <TimeIcon size="12px" style="margin-right: 4px;" />
+              {{ group.time }}
             </div>
-          </t-list-item>
+            
+            <t-list-item v-for="(result, index) in group.items" :key="index" class="custom-list-item">
+              <div class="result-card">
+                <!-- 左侧图标 -->
+                <div class="result-icon-wrapper" :class="getStatusTheme(getResultStatus(result))">
+                  <CheckCircleIcon v-if="getResultStatus(result) === 'qualified'" size="20px" />
+                  <ErrorCircleIcon v-else-if="getResultStatus(result) === 'risk'" size="20px" />
+                  <InfoCircleIcon v-else size="20px" />
+                </div>
+                
+                <!-- 中间信息 -->
+                <div class="result-info">
+                  <div class="result-header">
+                    <span class="result-type">{{ result.type }}</span>
+                  </div>
+                  <!-- 单项中不再重复显示时间，除非没有分组时间 -->
+                  <div class="result-meta" v-if="!group.time && (result.updatedAt || result.timestamp || result.time)">
+                    <TimeIcon size="12px" style="margin-right: 4px;" />
+                    {{ formatTime(result.updatedAt || result.timestamp || result.time) }}
+                  </div>
+                </div>
+
+                <!-- 右侧标签 -->
+                <div class="result-status">
+                  <t-tag :theme="getStatusTheme(getResultStatus(result))" variant="outline" size="small">
+                    {{ getStatusText(getResultStatus(result)) }}
+                  </t-tag>
+                </div>
+              </div>
+            </t-list-item>
+          </div>
         </t-list>
       </div>
 
@@ -57,19 +67,87 @@
 
 <script>
 import { mapState } from 'vuex';
-import { TimeIcon, ErrorCircleIcon, InfoCircleIcon } from 'tdesign-icons-vue-next';
+import { TimeIcon, ErrorCircleIcon, InfoCircleIcon, CheckCircleIcon } from 'tdesign-icons-vue-next';
 
 export default {
   name: 'DetectionResults',
   components: {
     TimeIcon,
     ErrorCircleIcon,
-    InfoCircleIcon
+    InfoCircleIcon,
+    CheckCircleIcon
   },
   computed: {
-    ...mapState(['detectionResults', 'processedImagePath'])
+    ...mapState(['detectionResults', 'processedImagePath']),
+    // 根据时间戳对检测结果进行分组
+    groupedResults() {
+      const results = this.detectionResults || [];
+      if (results.length === 0) return [];
+
+      const groups = {};
+      const noTimeGroup = [];
+
+      results.forEach(item => {
+        const ts = item.updatedAt || item.timestamp || item.time;
+        if (ts) {
+          const timeStr = this.formatTime(ts);
+          if (!groups[timeStr]) {
+            groups[timeStr] = [];
+          }
+          groups[timeStr].push(item);
+        } else {
+          noTimeGroup.push(item);
+        }
+      });
+
+      // 将分组转换为数组，按时间倒序排列（如果需要）
+      const groupArray = Object.keys(groups).map(time => ({
+        time,
+        items: groups[time]
+      }));
+
+      // 如果有无时间戳的数据，作为单独一组放在最后
+      if (noTimeGroup.length > 0) {
+        groupArray.push({
+          time: '', // 空时间表示不显示标题
+          items: noTimeGroup
+        });
+      }
+
+      return groupArray;
+    }
   },
   methods: {
+    // 获取检测结果状态：qualified(合格) | review(需复检) | risk(高风险，可保留原逻辑或暂不使用)
+    getResultStatus(result) {
+      if (!result || !result.type) return 'review';
+      const type = String(result.type).toLowerCase();
+      // Bolts -> 合格
+      if (type.includes('bolts')) return 'qualified';
+      // hole -> 需复检
+      if (type.includes('hole')) return 'review';
+      
+      // 默认逻辑（回退到旧有的置信度判断，或者默认需复检）
+      return result.confidence >= 0.8 ? 'risk' : 'review';
+    },
+    // 获取状态对应的显示文本
+    getStatusText(status) {
+      const map = {
+        qualified: '合格',
+        review: '需复检',
+        risk: '高风险'
+      };
+      return map[status] || '需复检';
+    },
+    // 获取状态对应的主题色
+    getStatusTheme(status) {
+      const map = {
+        qualified: 'success',
+        review: 'warning',
+        risk: 'danger'
+      };
+      return map[status] || 'warning';
+    },
     formatTime(ts) {
       if (!ts) return '';
       // 如果是秒级时间戳（10位），转为毫秒
@@ -149,6 +227,20 @@ export default {
   background-color: transparent;
 }
 
+.result-group {
+  margin-bottom: 16px;
+}
+
+.group-header {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  margin-bottom: 8px;
+  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
 .custom-list-item {
   padding: 0 !important;
   margin-bottom: 12px;
@@ -182,7 +274,14 @@ export default {
   flex-shrink: 0;
 }
 
-.result-icon-wrapper.high-risk {
+.result-icon-wrapper.success {
+  background-color: #e6f7ff; /* 浅蓝/浅绿，视TDesign success色而定，这里使用浅绿更合适 */
+  background-color: var(--td-brand-color-light); /* 或使用 success 对应的浅色变量 */
+  background-color: #E3F9E9; /* TDesign success light */
+  color: #2BA471; /* TDesign success */
+}
+
+.result-icon-wrapper.danger {
   background-color: #fcebe8; /* 浅红 */
   color: #d32029;
 }
