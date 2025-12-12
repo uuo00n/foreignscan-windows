@@ -58,8 +58,14 @@
 
       <!-- 无结果时使用 TDesign Empty -->
       <div v-else class="no-results">
-        <t-empty description="暂无检测结果" />
-        <t-button variant="text" size="small" class="hint-btn">请点击列表上方“开始”按钮进行检测</t-button>
+        <t-empty>
+          <template #description>
+            <div class="empty-content">
+              <div class="empty-title">暂无检测结果</div>
+              <div class="empty-hint">请点击列表上方“开始”按钮进行检测</div>
+            </div>
+          </template>
+        </t-empty>
       </div>
     </t-card>
   </div>
@@ -326,13 +332,23 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #999;
-  text-align: center;
   padding: 20px;
 }
 
-.hint-btn {
-  color: #0052d9;
-  margin-top: -10px;
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.empty-title {
+  font-size: 14px;
+  color: var(--td-text-color-secondary);
+  margin-bottom: 8px;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: var(--td-text-color-placeholder);
 }
 </style>
