@@ -142,11 +142,14 @@ export default createStore({
           id: record.id,
           path: fullPath
         };
-        // 清空检测结果
+        // 清空检测结果，避免显示上一个图片的旧数据
         state.detectionResults = [];
         state.processedImagePath = null;
-        // 切换记录时默认隐藏右侧面板，等待用户点击“检测结果”
-        state.showResultsPanel = false;
+        
+        // 逻辑修改：切换记录时，如果面板已经打开，则保持打开（后续逻辑应触发自动获取新数据的请求）
+        // 如果面板关闭，则保持关闭
+        // 之前的逻辑是 state.showResultsPanel = false; 强制关闭
+        // 现在不做任何修改，保留当前状态
       } else {
         state.currentImage = null;
       }

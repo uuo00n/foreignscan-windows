@@ -110,6 +110,8 @@ export default {
   methods: {
     // 引入设置结果与显隐状态的动作
     ...mapActions(['setDetectionResults', 'setShowResultsPanel', 'fetchDetectionsByImage']),
+    
+    // 执行检测（或获取结果）
     async runDetection() {
       // 点击同一个按钮实现“显示/隐藏”切换：
       // 1) 若面板已显示，则本次点击仅隐藏面板，不重复请求
@@ -117,34 +119,57 @@ export default {
         this.setShowResultsPanel(false);
         return;
       }
+      
+      // 否则加载数据并显示
+      await this.loadAndShowResults();
+    },
 
+    // 加载并显示结果的通用方法
+    async loadAndShowResults() {
       // 2) 若已有检测结果但面板未显示，直接显示结果（避免重复请求）
+      // 注意：切换图片时 detectionResults 会被清空，所以这里只在同一图片多次点击时有效
       if (this.detectionResults && this.detectionResults.length > 0) {
         this.setShowResultsPanel(true);
         return;
       }
 
-      // 3) 无结果时，按新接口规范从后端读取检测结果：GET /api/images/{id}/detections
+      // 3) 无结果时，按新接口规范从后端读取检测结果
       if (!this.currentImage || !this.currentImage.id) {
         return;
       }
 
       try {
-        // 直接调用 Vuex Action，通过统一的 API_BASE 和新路径获取检测结果
         const list = await this.$store.dispatch('fetchDetectionsByImage', { imageId: this.currentImage.id });
-        // 注：store 会在成功获取后自动 setDetectionResults 并打开右侧面板
-        // 若需要在此强制打开，可再调用 setShowResultsPanel(true)
+        
+        // 如果获取到结果，或者虽然没结果但后端返回正常（空数组），都保持面板打开状态
+        // store 中的 fetchDetectionsByImage 成功后会自动 SET_SHOW_RESULTS_PANEL(true)
+        
         if (!Array.isArray(list) || list.length === 0) {
-          // 如果后端暂时没有结果，清空并保持面板关闭
-          this.setDetectionResults([]);
-          this.setShowResultsPanel(false);
+           // 如果确实没结果，是否要保持面板打开？
+           // 用户希望“保持一直显示的状态”，所以即使是空结果也应该显示面板（显示暂无数据）
+           // 这里手动强制显示一下，以防 store 里只有在有结果时才显示
+           this.setShowResultsPanel(true);
         }
       } catch (error) {
-        // 出错时清空结果并关闭面板
         this.setDetectionResults([]);
+        // 出错时是否保持面板？通常出错可以关闭或者显示错误提示
+        // 这里暂时保持关闭以免干扰
         this.setShowResultsPanel(false);
         console.error('读取检测结果失败:', error);
       }
+    }
+  },
+  watch: {
+    // 监听 currentImage 变化，如果面板是打开状态，则自动加载新图片的结果
+    currentImage: {
+      handler(newVal, oldVal) {
+        // 如果面板当前是打开的，且切换到了新图片（ID不同）
+        if (this.showResultsPanel && newVal && newVal.id) {
+          // 自动加载新图片的结果
+          this.loadAndShowResults();
+        }
+      },
+      immediate: false
     }
   }
 }
