@@ -124,26 +124,26 @@ export default {
     }
   },
   methods: {
-    // 获取检测结果状态：qualified(合格) | review(需复检) | risk(高风险，可保留原逻辑或暂不使用)
+    // 获取检测结果状态：qualified(合格) | review(需复检) | risk(异常/高风险)
     getResultStatus(result) {
-      if (!result || !result.type) return 'review';
+      if (!result || !result.type) return 'risk';
       const type = String(result.type).toLowerCase();
       // Bolts -> 合格
       if (type.includes('bolts')) return 'qualified';
       // hole -> 需复检
       if (type.includes('hole')) return 'review';
       
-      // 默认逻辑（回退到旧有的置信度判断，或者默认需复检）
-      return result.confidence >= 0.8 ? 'risk' : 'review';
+      // 既不是 bolts 也不是 hole -> 异常 (risk)
+      return 'risk';
     },
     // 获取状态对应的显示文本
     getStatusText(status) {
       const map = {
         qualified: '合格',
         review: '需复检',
-        risk: '高风险'
+        risk: '异常'
       };
-      return map[status] || '需复检';
+      return map[status] || '异常';
     },
     // 获取状态对应的主题色
     getStatusTheme(status) {
