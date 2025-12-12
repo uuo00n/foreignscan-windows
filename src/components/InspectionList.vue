@@ -256,81 +256,107 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--td-component-stroke);
+  background-color: var(--td-bg-color-container);
 }
 
 .list-container {
   flex: 1;
   overflow-y: auto;
+  padding: 0;
 }
 
-/* 空态容器：填满列表区域，居中显示 */
+/* 空态容器 */
 .list-empty {
   flex: 1;
   display: flex;
-  align-items: center; /* 垂直居中 */
-  justify-content: center; /* 水平居中 */
+  align-items: center;
+  justify-content: center;
   padding: 16px;
+  color: var(--td-text-color-placeholder);
 }
 
 .active {
-  background-color: #f3f3f3;
+  background-color: var(--td-brand-color-light) !important;
+  /* 左侧高亮条，TDesign 风格通常在左侧 */
+  position: relative;
+}
+
+.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--td-brand-color);
+}
+
+/* 列表项样式优化 */
+:deep(.t-list-item) {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid var(--td-component-stroke);
+  background-color: var(--td-bg-color-container);
+}
+
+:deep(.t-list-item:hover) {
+  background-color: var(--td-bg-color-secondarycontainer);
 }
 
 .item-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  width: 100%;
 }
 
 .record-info {
   flex: 1;
+  min-width: 0;
 }
 
-/* 场景名：替代原来的ID显示 */
+/* 场景名 */
 .record-scene {
-  font-weight: bold;          /* 强调场景名 */
-  margin-bottom: 4px;         /* 与日期之间保持紧凑间距 */
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--td-text-color-primary);
+  margin-bottom: 4px;
 }
 
-/* 检测日期：显示在时间上方 */
+/* 检测日期 */
 .record-date {
   font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;         /* 与时间之间保持紧凑间距 */
+  color: var(--td-text-color-placeholder);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
 }
 
 .record-time {
   font-size: 12px;
-  color: #666;
-  margin-bottom: 5px;
-}
-
-.no-data {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100px;
-  color: #999;
-  font-size: 14px;
-  text-align: center;
-}
-
-.action-buttons {
-  padding: 10px;
-  display: flex;
-  justify-content: center;
-  border-top: 1px solid #e0e0e0;
+  color: var(--td-text-color-placeholder);
+  margin-bottom: 8px;
 }
 
 .list-toolbar {
-  padding: 8px;
+  padding: 12px 16px;
   display: flex;
   justify-content: center;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--td-component-stroke);
+  background-color: var(--td-bg-color-container);
 }
 
 .detected-filter {
-  padding: 8px 12px;
+  padding: 12px 16px;
+  background-color: var(--td-bg-color-container);
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.action-buttons {
+  padding: 16px;
+  background-color: var(--td-bg-color-container);
+  border-top: 1px solid var(--td-component-stroke);
 }
 </style>

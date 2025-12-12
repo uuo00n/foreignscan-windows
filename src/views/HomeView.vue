@@ -319,113 +319,113 @@ export default {
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  color: #333;
-}
+/* 移除全局 reset，已经在 App.vue 中定义 */
 
 .home {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  background-color: var(--app-bg-color);
 }
 
 .app-header {
+  height: var(--app-header-height);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 0 24px;
+  background-color: var(--td-bg-color-container); /* 改为亮色背景，符合 TDesign 风格 */
+  color: var(--td-text-color-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* 更柔和的阴影 */
+  border-bottom: 1px solid var(--td-component-stroke);
+  z-index: 10;
 }
 
 .logo {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.actions {
+  font-size: 20px;
+  font-weight: 600;
   display: flex;
-  gap: 10px;
-}
-
-.action-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  background-color: #4285f4;
-  color: white;
-  cursor: pointer;
+  align-items: center;
+  gap: 8px;
+  color: var(--td-text-color-primary); /* 使用标准文字颜色 */
+  /* 移除之前的渐变，使用更稳重的纯色或品牌色 */
 }
 
 .app-content {
-  display: flex;
   flex: 1;
+  display: flex;
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar {
-  width: 250px;
-  overflow-y: auto;
+  width: 320px;
+  background-color: var(--td-bg-color-container);
+  border-right: 1px solid var(--td-component-stroke);
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
 }
 
 .main-content {
   flex: 1;
-  overflow: hidden;
+  position: relative;
+  background-color: var(--td-bg-color-page);
+  display: flex;
+  flex-direction: column;
+}
+
+.jobs-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 320px;
+  background: var(--td-bg-color-container);
+  padding: 16px;
+  border-radius: 3px; /* TDesign 圆角较小 */
+  box-shadow: 0 3px 14px 2px rgba(0, 0, 0, 0.05), 0 8px 10px 1px rgba(0, 0, 0, 0.06), 0 5px 5px -3px rgba(0, 0, 0, 0.1); /* TDesign 阴影 */
+  z-index: 100;
+  border: 1px solid var(--td-component-border);
 }
 
 .results-panel {
-  width: 480px;
-  max-width: 50vw;
-  overflow-y: auto;
+  width: 360px;
+  background-color: var(--td-bg-color-container);
+  border-left: 1px solid var(--td-component-stroke);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.05);
+  z-index: 8;
 }
 
-/* 右侧面板入场/退场动画：保持两者“速度一致”，统一时长与缓动 */
+/* ... 动画部分保持不变 ... */
 .results-slide-enter-active,
 .results-slide-leave-active {
-  transition: transform 240ms ease-in-out, /* 统一 240ms，缓动一致 */
-              opacity 240ms ease-in-out;
-  will-change: transform, opacity; /* 提升动画流畅度 */
-}
-/* 入场起点与退场终点：位移更明显，且透明度更低，视觉更自然 */
-.results-slide-enter-from,
-.results-slide-leave-to {
-  transform: translateX(24px); /* 从右侧更明显的位移进入/离开 */
-  opacity: 0.01;               /* 减少闪烁 */
-}
-.results-slide-enter-to,
-.results-slide-leave-from {
-  transform: translateX(0);
-  opacity: 1;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 无障碍：尊重系统“减少动态效果”设置，若开启则禁用动画 */
-@media (prefers-reduced-motion: reduce) {
-  .results-slide-enter-active,
-  .results-slide-leave-active {
-    transition: none;
-  }
+.results-slide-enter-from,
+.results-slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0.8;
 }
 
 .app-footer {
-  padding: 10px 20px;
-  background-color: #f5f5f5;
-  border-top: 1px solid #e0e0e0;
-  display: flex;               /* 使底部为左右布局 */
-  justify-content: space-between; /* 左侧状态信息，右侧按钮 */
-  align-items: center;         /* 垂直居中 */
+  height: var(--app-footer-height);
+  background-color: var(--td-bg-color-container); /* 亮色底部 */
+  color: var(--td-text-color-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  font-size: 12px;
+  border-top: 1px solid var(--td-component-stroke);
 }
 
 .status-info {
-  display: flex;                 /* 使用 Flex 布局 */
-  align-items: center;           /* 垂直居中 */
-  gap: 24px;                     /* 三个状态块之间的固定间距 */
+  display: flex;
+  gap: 24px;
+  color: var(--td-text-color-secondary);
 }
 
 .status-item {
@@ -433,45 +433,63 @@ body {
   align-items: center;
 }
 
-.label {
-  margin-right: 5px;
-  color: #666;
+.status-item .label {
+  margin-right: 6px;
+  color: var(--td-text-color-placeholder);
 }
 
-.value {
-  font-weight: bold;
+.status-item .value {
+  font-weight: 500;
+  color: var(--td-text-color-primary);
 }
 
-/* 右下角浮动圆形按钮样式 */
 .footer-action {
   display: flex;
   align-items: center;
 }
 
-.calendar-btn {
-  /* 放置于底部栏右侧，避免越界 */
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+/* 恢复默认按钮样式 */
+.footer-action .t-button {
+  /* color: ... ; */ 
+}
+.footer-action .t-button:hover {
+  /* ... */
 }
 
-/* 识别任务弹窗样式优化 */
+/* 调整弹窗内样式 */
 .jobs-dialog {
-  max-height: 60vh; /* 弹窗内部滚动区域，避免过长 */
+  max-height: 500px;
   overflow-y: auto;
+  padding: 8px;
 }
-.jobs-dialog .job-item {
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+
+.job-item {
+  padding: 16px;
+  border: 1px solid var(--td-component-border);
+  border-radius: 3px;
+  margin-bottom: 12px;
+  background-color: var(--td-bg-color-container);
+  transition: all 0.2s;
 }
-.jobs-dialog .job-row {
+
+.job-item:hover {
+  border-color: var(--td-brand-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.job-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap; /* 保证在窄屏下不拥挤 */
-}
-.jobs-dialog .job-message {
-  color: #666;
-  flex: 1;
-  min-width: 160px;
+  margin-bottom: 8px;
 }
 
+.job-message {
+  flex: 1;
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 </style>
