@@ -41,7 +41,13 @@
         >
           <div class="item-row">
             <!-- 选择框：使用 TDesign Checkbox -->
-            <t-checkbox v-model="record.selected" :name="'check-' + record.id" />
+            <!-- 阻止点击冒泡，防止触发 list-item 的点击事件导致双重切换 -->
+            <div @click.stop v-if="isBatchMode">
+              <t-checkbox
+                :checked="isRecordSelected(record.id)"
+                @change="toggleRecord(record.id)"
+              />
+            </div>
             <div class="record-info">
               <!-- 场景名：仅展示场景名，不再展示ID -->
               <div class="record-scene">{{ getSceneName(record) }}</div>
@@ -65,10 +71,10 @@
     </template>
 
     <!-- 将选择按钮放在底部导出按钮的上方，视觉更贴近列表操作区域 -->
-    <div class="list-toolbar">
+    <div class="list-toolbar" v-if="isBatchMode">
       <t-space>
         <t-button theme="primary" @click="selectAllFiltered">全选</t-button>
-        <t-button variant="outline" @click="clearSelectionFiltered">取消</t-button>
+        <t-button theme="default" variant="outline" @click="clearSelectionFiltered">取消选择</t-button>
       </t-space>
     </div>
 
@@ -92,7 +98,7 @@ export default {
   },
   computed: {
     // 引入场景名称映射，用于根据 sceneId 显示场景中文名
-    ...mapState(['inspectionRecords', 'currentRecord', 'backendStatus', 'backendError', 'sceneNameMap']),
+    ...mapState(['inspectionRecords', 'currentRecord', 'backendStatus', 'backendError', 'sceneNameMap', 'isBatchMode', 'batchSelectedIds']),
     hasBackendError() {
       return this.backendStatus === 'error';
     },
@@ -111,14 +117,32 @@ export default {
   },
   methods: {
     ...mapActions(['setCurrentRecord', 'fetchImagesFromServer', 'fetchSceneNameMap', 'fetchImagesByFilter']),
+    // 选中记录
     selectRecord(record) {
+      if (this.isBatchMode) {
+        // 批量模式下点击整个条目也可以触发选择切换
+        this.toggleRecord(record.id);
+        return;
+      }
       this.setCurrentRecord(record);
     },
-    selectAllFiltered() {
-      (this.filteredRecords || []).forEach(r => { if (r) r.selected = true; });
+    // 判断记录是否在批量选择中
+    isRecordSelected(id) {
+      if (!this.batchSelectedIds) return false;
+      return this.batchSelectedIds.includes(id);
     },
+    // 切换记录选中状态
+    toggleRecord(id) {
+      this.$store.commit('TOGGLE_BATCH_SELECTED_ID', id);
+    },
+    // 全选当前筛选后的列表（适配新逻辑）
+    selectAllFiltered() {
+      const ids = this.filteredRecords.map(r => r.id);
+      this.$store.commit('SET_BATCH_SELECTED_IDS', ids);
+    },
+    // 取消选择（适配新逻辑）
     clearSelectionFiltered() {
-      (this.filteredRecords || []).forEach(r => { if (r) r.selected = false; });
+      this.$store.commit('SET_BATCH_SELECTED_IDS', []);
     },
     async retryConnection() {
       // 重试时按当前标签重新加载，避免仅请求全部列表

@@ -94,10 +94,16 @@ export default createStore({
     backendError: null,
     // 任务状态：jobId -> job
     detectJobs: {},
-    listActiveTab: 'all'
+    listActiveTab: 'all',
+    // 批量处理模式状态
+    isBatchMode: false,
+    // 批量选择选中的记录ID集合
+    batchSelectedIds: []
   },
   getters: {
-    hasBackendError: state => state.backendStatus === 'error'
+    hasBackendError: state => state.backendStatus === 'error',
+    isBatchMode: state => state.isBatchMode,
+    batchSelectedIds: state => state.batchSelectedIds
   },
   mutations: {
     SET_INSPECTION_RECORDS(state, records) {
@@ -200,6 +206,24 @@ export default createStore({
     },
     SET_LIST_ACTIVE_TAB(state, tab) {
       state.listActiveTab = tab || 'all';
+    },
+    SET_IS_BATCH_MODE(state, isBatch) {
+      state.isBatchMode = !!isBatch;
+      if (!isBatch) {
+        state.batchSelectedIds = [];
+      }
+    },
+    SET_BATCH_SELECTED_IDS(state, ids) {
+      state.batchSelectedIds = Array.isArray(ids) ? ids : [];
+    },
+    TOGGLE_BATCH_SELECTED_ID(state, id) {
+      if (!id) return;
+      const idx = state.batchSelectedIds.indexOf(id);
+      if (idx >= 0) {
+        state.batchSelectedIds.splice(idx, 1);
+      } else {
+        state.batchSelectedIds.push(id);
+      }
     }
   },
   actions: {

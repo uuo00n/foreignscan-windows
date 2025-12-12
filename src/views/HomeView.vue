@@ -7,8 +7,15 @@
         <!-- 说明：后续可在 @click 里绑定筛选或启动逻辑 -->
         <t-space size="small">
           <t-button type="primary" @click="startSelectedDetect">开始</t-button>
-          <t-button theme="success">合格</t-button>
-          <t-button theme="danger">缺陷</t-button>
+          <!-- <t-button theme="success">合格</t-button> -->
+          <!-- <t-button theme="danger">缺陷</t-button> -->
+          <t-button
+            :theme="isBatchMode ? 'primary' : 'default'"
+            variant="outline"
+            @click="toggleBatchMode"
+          >
+            {{ isBatchMode ? '退出批量' : '批量处理' }}
+          </t-button>
           <t-button shape="circle" theme="primary" @click="refreshList" title="刷新列表">
             <RefreshIcon size="16" />
           </t-button>
@@ -155,7 +162,7 @@ export default {
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
-    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords', 'listActiveTab']),
+    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords', 'listActiveTab', 'isBatchMode']),
     counts() {
       const list = Array.isArray(this.inspectionRecords) ? this.inspectionRecords : [];
       const statusKey = (s) => {
@@ -211,12 +218,20 @@ export default {
         MessagePlugin.error('后端未连接，无法触发识别');
         return;
       }
-      const records = (this.$store.state.inspectionRecords || []).filter(r => r && r.selected);
-      if (!records.length) {
-        MessagePlugin.warning('请先在列表勾选需要识别的图片');
+
+      let ids = [];
+      if (this.isBatchMode && this.$store.getters.batchSelectedIds && this.$store.getters.batchSelectedIds.length > 0) {
+        ids = this.$store.getters.batchSelectedIds;
+      } else {
+        const records = (this.$store.state.inspectionRecords || []).filter(r => r && r.selected);
+        ids = records.map(r => r.id);
+      }
+
+      if (!ids.length) {
+        MessagePlugin.warning('请先选择需要识别的图片');
         return;
       }
-      const ids = records.map(r => r.id);
+
       try {
         const result = await this.$store.dispatch('startYOLOForSelected', { ids });
         const total = result.length;
@@ -250,6 +265,29 @@ export default {
         console.error('批量触发失败:', e);
         MessagePlugin.error('触发失败，请检查后端服务');
       }
+    },
+    // 切换批量模式
+    toggleBatchMode() {
+      const next = !this.isBatchMode;
+      this.$store.commit('SET_IS_BATCH_MODE', next);
+    },
+    // 全选当前列表
+    selectAll() {
+      const list = this.$store.state.inspectionRecords || [];
+      const ids = list.map(r => r.id);
+      this.$store.commit('SET_BATCH_SELECTED_IDS', ids);
+    },
+    // 取消选择
+    clearSelection() {
+      this.$store.commit('SET_BATCH_SELECTED_IDS', []);
+    },
+    // 筛选合格（预留）
+    filterQualified() {
+      this.$store.dispatch('fetchImagesByFilter', { status: 'qualified' });
+    },
+    // 筛选缺陷（预留）
+    filterDefect() {
+      this.$store.dispatch('fetchImagesByFilter', { status: 'exception' });
     },
     calcProgress(job) {
       const total = job.Total || 0;
