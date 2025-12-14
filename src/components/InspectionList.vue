@@ -79,7 +79,7 @@
     </div>
 
     <!-- 底部操作按钮：使用 TDesign Button -->
-    <div class="action-buttons">
+    <div class="action-buttons" v-if="false">
       <t-button block type="primary" :disabled="filteredRecords.length === 0 || hasBackendError">导出报告</t-button>
     </div>
   </div>
