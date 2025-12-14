@@ -56,6 +56,10 @@
           />
         </t-select>
         <t-button type="primary" @click="refresh">刷新</t-button>
+        <t-button theme="default" @click="exportReport" style="margin-left: 8px">
+          <template #icon><DownloadIcon /></template>
+          导出异常报告
+        </t-button>
       </div>
     </t-card>
 
@@ -109,14 +113,18 @@
 
 <script>
 import { mapState, mapActions } from 'vuex';
+import apiConfig from '../config/api.json';
 // 引入 TDesign 图标：左箭头图标用于返回
-import { ChevronLeftIcon } from 'tdesign-icons-vue-next';
+import { ChevronLeftIcon, DownloadIcon } from 'tdesign-icons-vue-next';
+
+const API_BASE = apiConfig.API_BASE;
 
 export default {
   name: 'DateListView',
   components: {
     // 注册图标组件，确保在模板中可用
-    ChevronLeftIcon
+    ChevronLeftIcon,
+    DownloadIcon
   },
   computed: {
     ...mapState(['inspectionRecords', 'sceneNameMap']),
@@ -161,6 +169,121 @@ export default {
       await this.fetchImagesByFilter(params);
       // 刷新数据后重置为第一页
       this.currentPage = 1;
+    },
+    async exportReport() {
+      // 导出异常报告：基于当前日期/场景筛选条件，强制状态为异常
+      const qs = new URLSearchParams();
+      // 强制只导出异常
+      qs.set('status', '已检测');
+      qs.set('hasIssue', 'true');
+      // 请求包含检测详情（后端需要支持）
+      qs.set('includeDetails', 'true');
+
+      // 1. 日期参数
+      if (this.dateMode === 'single') {
+        if (this.singleDate) {
+          qs.set('start', this.singleDate);
+          qs.set('end', this.singleDate);
+        }
+      } else {
+        if (this.dateRange && this.dateRange.length === 2) {
+          qs.set('start', this.dateRange[0]);
+          qs.set('end', this.dateRange[1]);
+        }
+      }
+
+      // 2. 场景参数
+      if (this.selectedScene) {
+        qs.set('sceneId', this.selectedScene);
+      }
+
+      try {
+        this.$message.loading('正在导出报告...', 0);
+        // 使用 fetch 直接调用后端接口，避免影响当前列表视图状态
+        const url = `${API_BASE}api/images/filter?${qs.toString()}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // 关闭 loading
+        this.$message.closeAll();
+
+        if (!response.ok) {
+          this.$message.error(data.message || '导出失败');
+          return;
+        }
+
+        const records = Array.isArray(data.images) ? data.images : (Array.isArray(data.list) ? data.list : []);
+        if (records.length === 0) {
+          this.$message.warning('当前筛选条件下无异常记录');
+          return;
+        }
+
+        // 3. 生成 CSV 内容
+        // CSV Header
+        let csvContent = '\uFEFF'; // BOM 防止乱码
+        csvContent += "ID,场景,日期,时间,状态,缺陷详情\n";
+
+        records.forEach(r => {
+          // 处理字段
+          const id = r.id || r._id || '';
+          const scene = this.getSceneName(r); // 复用现有方法
+          // timestamp: "2025-12-14T17:42:54.000Z"
+          let dateStr = '';
+          let timeStr = '';
+          if (r.timestamp) {
+            try {
+              const d = new Date(r.timestamp);
+              // 简单的格式化，或者复用 formatDateValue / formatTime
+              // 这里手动格式化确保导出格式统一
+              const pad = n => n < 10 ? '0' + n : n;
+              dateStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+              timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            } catch (_) {}
+          }
+          const status = '缺陷'; // 既然是异常报告，状态统一为缺陷
+
+          // 缺陷详情：拼接 detections 中的 label/class
+          let details = '';
+          const detList = r.detectionResults || r.detections || r.results;
+          if (Array.isArray(detList)) {
+            const types = detList.map(d => d.class || d.label || d.type || '未知缺陷');
+            details = types.join('; ');
+          }
+
+          // CSV 转义处理：双引号转为两个双引号，整个字段包在双引号内
+          const escape = (val) => `"${String(val || '').replace(/"/g, '""')}"`;
+
+          const row = [
+            escape(id),
+            escape(scene),
+            escape(dateStr),
+            escape(timeStr),
+            escape(status),
+            escape(details)
+          ].join(",");
+          csvContent += row + "\n";
+        });
+
+        // 4. 触发下载
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const downloadUrl = URL.createObjectURL(blob);
+        link.setAttribute("href", downloadUrl);
+        const fileName = `abnormal_report_${new Date().toISOString().slice(0,10)}.csv`;
+        link.setAttribute("download", fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(downloadUrl);
+
+        this.$message.success(`成功导出 ${records.length} 条异常记录`);
+
+      } catch (error) {
+        console.error('导出报告出错:', error);
+        this.$message.closeAll();
+        this.$message.error('导出报告出错');
+      }
     },
     selectRecord(record) {
       // 选中记录后，便于右侧查看详情
