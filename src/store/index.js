@@ -326,9 +326,10 @@ export default createStore({
         const response = await fetch(API_BASE + 'api/images');
         const data = await response.json();
         
-        if (response.ok && data.images) {
-          commit('SET_INSPECTION_RECORDS', data.images);
-          return data.images;
+        if (response.ok) {
+          const list = data.images || [];
+          commit('SET_INSPECTION_RECORDS', list);
+          return list;
         } else {
           commit('SET_BACKEND_STATUS', 'error');
           commit('SET_BACKEND_ERROR', '获取数据失败');
