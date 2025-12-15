@@ -602,16 +602,14 @@ export default createStore({
                     foundIssue = true;
                     break;
                   }
-                  // 如果既不是 bolts 也不是 hole，按置信度兜底？
+                  // 如果既不是 bolts 也不是 hole，视为异常
                   // 用户需求："当最新的检测结果时间戳内没有含有异常，标记为合格"
                   // 这里的“异常”通常指 'hole' 或者高风险项。
                   // 如果是 Bolts，不算异常。
                   if (!type.includes('bolts') && !type.includes('hole')) {
-                    // 其他类型，保留原有置信度判断或默认视为潜在异常
-                    if ((item.confidence || 0) >= 0.8) {
-                      foundIssue = true;
-                      break;
-                    }
+                    // 其他类型（包括未知类型）直接视为异常
+                    foundIssue = true;
+                    break;
                   }
                 }
                 finalHasIssue = foundIssue;
