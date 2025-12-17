@@ -310,6 +310,29 @@ export default createStore({
         return false;
       }
     },
+    // 获取指定场景的最新详情（含最新图片状态）
+    async fetchSceneLatestInfo({ commit, dispatch }, sceneId) {
+      if (!sceneId) {
+        commit('SET_CURRENT_SCENE_LATEST_INFO', null);
+        return null;
+      }
+      try {
+        const response = await fetch(`${API_BASE}api/scenes/${sceneId}`);
+        const data = await response.json();
+        if (response.ok && data.success) {
+          commit('SET_CURRENT_SCENE_LATEST_INFO', data);
+          return data;
+        } else {
+          commit('SET_CURRENT_SCENE_LATEST_INFO', null);
+          return null;
+        }
+      } catch (e) {
+        console.error('获取场景详情失败:', e);
+        commit('SET_CURRENT_SCENE_LATEST_INFO', null);
+        return null;
+      }
+    },
+
     // 获取图片列表
     async fetchImagesFromServer({ commit, dispatch }) {
       try {

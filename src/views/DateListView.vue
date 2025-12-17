@@ -65,6 +65,24 @@
 
     <!-- 列表区域：显示后端返回的数据 -->
     <div class="content">
+      <!-- 场景最新状态概览卡片 -->
+      <t-card v-if="selectedScene && currentSceneLatestInfo" :bordered="false" class="scene-status-card">
+        <div class="scene-status-row">
+          <div class="status-left">
+            <span class="label">当前场景状态：</span>
+            <t-tag :theme="sceneLatestTheme" variant="light" size="large">
+              {{ sceneLatestText }}
+            </t-tag>
+            <span class="sub-label" v-if="currentSceneLatestInfo.latestImage">
+              (最新更新: {{ formatTime(currentSceneLatestInfo.latestImage.createdAt) }})
+            </span>
+          </div>
+          <div class="status-right" v-if="currentSceneLatestInfo.latestImage">
+            <t-button variant="text" theme="primary" @click="viewLatestImage">查看最新图片</t-button>
+          </div>
+        </div>
+      </t-card>
+
       <t-list v-if="inspectionRecords.length > 0" split>
         <t-list-item
           v-for="record in pagedRecords"
@@ -421,6 +439,35 @@ export default {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.scene-status-card {
+  margin-bottom: 12px;
+  background-color: #fff;
+  border-radius: 4px;
+}
+
+.scene-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-left .label {
+  font-weight: 500;
+  color: #333;
+}
+
+.status-left .sub-label {
+  font-size: 12px;
+  color: #999;
+  margin-left: 8px;
 }
 
 .content {
