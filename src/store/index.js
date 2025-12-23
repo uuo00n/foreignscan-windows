@@ -377,6 +377,69 @@ export default createStore({
         return { success: false, message: error.message };
       }
     },
+    // 删除场景
+    async deleteScene({ commit }, sceneId) {
+      try {
+        const response = await fetch(`${API_BASE}api/scenes/${sceneId}`, {
+          method: 'DELETE'
+        });
+        
+        // 处理 204 No Content (成功，无响应体)
+        if (response.status === 204) {
+          return { success: true };
+        }
+
+        let data = {};
+        try {
+          // 尝试解析 JSON，如果响应体为空或非 JSON 则捕获错误
+          const text = await response.text();
+          if (text) {
+             data = JSON.parse(text);
+          }
+        } catch (e) {
+          // 忽略解析错误，使用默认 data
+        }
+
+        if (response.ok) {
+          return { success: true, data };
+        } else {
+          return { success: false, message: (data && data.message) || `删除场景失败 (${response.status})` };
+        }
+      } catch (error) {
+        console.error('删除场景失败:', error);
+        return { success: false, message: error.message };
+      }
+    },
+    // 批量删除场景
+    async batchDeleteScenes({ dispatch }, sceneIds) {
+      if (!Array.isArray(sceneIds) || sceneIds.length === 0) {
+        return { success: true, count: 0 };
+      }
+      
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
+
+      // 并行执行删除操作
+      const promises = sceneIds.map(id => dispatch('deleteScene', id));
+      const results = await Promise.all(promises);
+
+      results.forEach(result => {
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+          errors.push(result.message);
+        }
+      });
+
+      return {
+        success: failCount === 0,
+        successCount,
+        failCount,
+        errors
+      };
+    },
     // 上传图片（样式图）
     async uploadImage({ commit }, { file, sceneId }) {
       try {

@@ -1,18 +1,49 @@
 <template>
   <div class="scene-preview-container">
     <div class="toolbar">
-      <h2>场景预览</h2>
-      <t-button theme="primary" @click="showAddDialog">
-        <template #icon><AddIcon /></template>
-        添加场景
-      </t-button>
+      <template v-if="!isSelectionMode">
+        <t-space>
+          <t-button theme="primary" @click="showAddDialog">
+            <template #icon><AddIcon /></template>
+            添加场景
+          </t-button>
+          <t-button variant="outline" @click="toggleSelectionMode">
+             批量管理
+          </t-button>
+        </t-space>
+      </template>
+      <template v-else>
+         <t-space>
+           <t-button variant="outline" @click="toggleSelectionMode">取消</t-button>
+           <t-button variant="outline" @click="toggleSelectAll">
+             {{ isAllSelected ? '取消全选' : '全选' }}
+           </t-button>
+           <t-button theme="danger" :disabled="selectedSceneIds.length === 0" @click="handleBatchDelete">
+             <template #icon><DeleteIcon /></template>
+             删除选中 ({{ selectedSceneIds.length }})
+           </t-button>
+         </t-space>
+      </template>
     </div>
     
     <t-loading :loading="loading">
       <div class="scene-grid" v-if="scenes.length > 0">
-        <t-card v-for="scene in scenes" :key="scene.id" class="scene-card" hover-shadow>
+        <t-card 
+          v-for="scene in scenes" 
+          :key="scene.id" 
+          class="scene-card" 
+          :class="{ 'is-selected': selectedSceneIds.includes(scene.id), 'is-selection-mode': isSelectionMode }"
+          hover-shadow
+          @click="toggleSelectScene(scene.id)"
+        >
            <template #cover>
              <div class="card-cover">
+               <!-- Selection Overlay -->
+               <div v-if="isSelectionMode" class="selection-overlay">
+                 <CheckCircleIcon v-if="selectedSceneIds.includes(scene.id)" class="check-icon checked" />
+                 <div v-else class="check-circle-outline"></div>
+               </div>
+
                <img v-if="sceneCovers[scene.id]" :src="sceneCovers[scene.id]" alt="cover" class="cover-img" />
                <div v-else class="cover-placeholder">
                  <ImageIcon size="32" />
@@ -24,9 +55,9 @@
              <h3>{{ scene.name }}</h3>
              <p class="scene-id">ID: {{ scene.id }}</p>
            </div>
-           <template #actions>
+           <template #actions v-if="!isSelectionMode">
              <t-space size="small">
-                <t-button variant="text" theme="default" @click="triggerUpload(scene)">
+                <t-button variant="text" theme="default" @click.stop="triggerUpload(scene)">
                    <template #icon><UploadIcon /></template>
                    上传图片
                 </t-button>
@@ -74,8 +105,8 @@
 <script>
 import { computed, ref, onMounted, reactive } from 'vue';
 import { useStore } from 'vuex';
-import { AddIcon, UploadIcon, ImageIcon } from 'tdesign-icons-vue-next';
-import { MessagePlugin } from 'tdesign-vue-next';
+import { AddIcon, UploadIcon, ImageIcon, DeleteIcon, CheckCircleIcon, CloseCircleIcon } from 'tdesign-icons-vue-next';
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import apiConfig from '../config/api.json';
 
 const API_BASE = apiConfig.API_BASE;
@@ -85,7 +116,10 @@ export default {
   components: {
     AddIcon,
     UploadIcon,
-    ImageIcon
+    ImageIcon,
+    DeleteIcon,
+    CheckCircleIcon,
+    CloseCircleIcon
   },
   setup() {
     const store = useStore();
@@ -95,6 +129,10 @@ export default {
     const formRef = ref(null);
     const fileInputRef = ref(null);
     
+    // 批量选择模式
+    const isSelectionMode = ref(false);
+    const selectedSceneIds = ref([]);
+
     // 存储场景ID对应的封面图片URL
     const sceneCovers = reactive({});
     // 当前正在上传图片的场景ID
@@ -252,6 +290,66 @@ export default {
       uploadSceneId.value = null;
     };
 
+    // 批量操作逻辑
+    const toggleSelectionMode = () => {
+      isSelectionMode.value = !isSelectionMode.value;
+      if (!isSelectionMode.value) {
+        selectedSceneIds.value = [];
+      }
+    };
+
+    const toggleSelectScene = (sceneId) => {
+      if (!isSelectionMode.value) return;
+      const idx = selectedSceneIds.value.indexOf(sceneId);
+      if (idx >= 0) {
+        selectedSceneIds.value.splice(idx, 1);
+      } else {
+        selectedSceneIds.value.push(sceneId);
+      }
+    };
+    
+    const isAllSelected = computed(() => {
+      return scenes.value.length > 0 && selectedSceneIds.value.length === scenes.value.length;
+    });
+
+    const toggleSelectAll = () => {
+      if (isAllSelected.value) {
+        selectedSceneIds.value = [];
+      } else {
+        selectedSceneIds.value = scenes.value.map(s => s.id);
+      }
+    };
+
+    const handleBatchDelete = () => {
+      if (selectedSceneIds.value.length === 0) return;
+      
+      const confirmDialog = DialogPlugin.confirm({
+        header: '确认删除',
+        body: `确定要删除选中的 ${selectedSceneIds.value.length} 个场景吗？此操作不可恢复。`,
+        theme: 'danger',
+        onConfirm: async () => {
+          loading.value = true;
+          confirmDialog.hide();
+          
+          const res = await store.dispatch('batchDeleteScenes', selectedSceneIds.value);
+          
+          loading.value = false;
+          if (res.success) {
+            MessagePlugin.success(`成功删除 ${res.successCount} 个场景`);
+            if (res.failCount > 0) {
+               MessagePlugin.warning(`${res.failCount} 个场景删除失败`);
+            }
+            // 退出选择模式并刷新
+            isSelectionMode.value = false;
+            selectedSceneIds.value = [];
+            fetchScenes();
+          } else {
+            MessagePlugin.error('批量删除失败');
+          }
+        }
+      });
+    };
+
     return {
       scenes,
       loading,
@@ -265,7 +363,15 @@ export default {
       showAddDialog,
       confirmAddScene,
       triggerUpload,
-      handleFileChange
+      handleFileChange,
+      // 批量操作
+      isSelectionMode,
+      selectedSceneIds,
+      toggleSelectionMode,
+      toggleSelectScene,
+      isAllSelected,
+      toggleSelectAll,
+      handleBatchDelete
     };
   }
 };
@@ -273,7 +379,7 @@ export default {
 
 <style scoped>
 .scene-preview-container {
-  padding: 20px;
+  padding: 24px;
   height: 100%;
   overflow-y: auto;
   background-color: var(--td-bg-color-page);
@@ -282,7 +388,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .scene-grid {
   display: grid;
@@ -290,8 +396,38 @@ export default {
   gap: 20px;
 }
 .scene-card {
-  /* cursor: pointer; removed to allow button clicks */
+  position: relative;
+  transition: all 0.2s;
 }
+.scene-card.is-selection-mode {
+  cursor: pointer;
+}
+.scene-card.is-selected {
+  border-color: var(--td-brand-color);
+  box-shadow: 0 0 0 2px var(--td-brand-color-light);
+}
+
+.selection-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+.check-icon.checked {
+  color: var(--td-brand-color);
+  font-size: 24px;
+  background: white;
+  border-radius: 50%;
+}
+.check-circle-outline {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background-color: rgba(0,0,0,0.2);
+  box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
 .card-cover {
   height: 160px;
   background-color: #f3f3f3;
