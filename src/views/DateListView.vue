@@ -91,18 +91,17 @@
         >
           <!-- 多行列表样式：顶部主信息（场景 + 状态），底部次级信息（日期与时间） -->
           <div class="item-col">
-            <!-- 第一行：主信息（场景名称/ID）与状态标签并列展示，降低拥挤感 -->
+            <!-- 第一行：主信息（场景名称）与状态标签改为左对齐 -->
             <div class="line-top">
-              <div class="record-title">{{ record.sceneId || '未知场景' }}</div>
+              <div class="record-title">{{ getSceneName(record) }}</div>
               <t-tag :theme="statusTheme(record)" variant="light" size="small">
                 {{ getStatusText(record) }}
               </t-tag>
             </div>
-            <!-- 第二行：次级信息（日期 + 时间），用较小字号弱化但仍清晰可读 -->
-            <div class="line-bottom">
-              <div class="record-scene">场景：{{ getSceneName(record) }}</div>
-              <div class="record-subtitle">{{ formatDateValue(record.timestamp) }} {{ formatTime(record.timestamp) }}</div>
-            </div>
+            <!-- 第二行：次级信息（场景名称），单独一行 - 已移除，因为标题已显示场景名 -->
+            <!-- <div class="record-scene">场景：{{ getSceneName(record) }}</div> -->
+            <!-- 第三行：次级信息（日期 + 时间），单独一行 -->
+            <div class="record-subtitle">{{ formatDateValue(record.timestamp) }} {{ formatTime(record.timestamp) }}</div>
           </div>
         </t-list-item>
       </t-list>
@@ -320,18 +319,21 @@ export default {
     },
     // 分页变化兼容处理
     handlePaginationChange({ current, pageSize }) {
-      if (typeof current === 'number') this.currentPage = current;
-      if (typeof pageSize === 'number') {
+      // 只有当 pageSize 真正发生变化时才重置为第一页
+      if (typeof pageSize === 'number' && pageSize !== this.pageSize) {
         this.pageSize = pageSize;
-        // 每页数量变化后跳回第一页
         this.currentPage = 1;
+      } else if (typeof current === 'number') {
+        // 仅切换页码
+        this.currentPage = current;
       }
     },
     getSceneName(record) {
       if (!record) return '未知场景';
       const id = record.sceneId != null ? String(record.sceneId) : null;
       const byMap = id && this.sceneNameMap ? this.sceneNameMap[id] : null;
-      return byMap || record.sceneName || record.scene || (id || '未知场景');
+      // 优先使用映射名称，其次记录中的名称，最后回退到'未知场景'（不再显示ID）
+      return byMap || record.sceneName || record.scene || '未知场景';
     },
     getStatusText(record) {
       const det = record && record.isDetected === true;
@@ -510,19 +512,20 @@ export default {
   color: #666;
 }
 
-/* 第一行顶部：主信息与状态标签左右分布 */
+/* 第一行顶部：主信息与状态标签改为左对齐，去除中间大片留白 */
 .line-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 12px;
 }
 
-/* 第二行底部：次级信息（日期时间） */
-.line-bottom {
+/* 第二行底部：次级信息（日期时间）- 已弃用，直接使用 flex-column 布局 */
+/*.line-bottom {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-}
+}*/
 
 /* 主标题：场景名称/ID，更醒目 */
 .record-title {
