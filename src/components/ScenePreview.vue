@@ -2,17 +2,16 @@
   <div class="scene-preview-container">
     <div class="toolbar">
       <template v-if="!isSelectionMode">
-        <t-space>
-          <t-button theme="primary" @click="showAddDialog">
-            <template #icon><AddIcon /></template>
-            添加场景
-          </t-button>
-          <t-button variant="outline" @click="toggleSelectionMode">
-             批量管理
-          </t-button>
-        </t-space>
+        <t-button theme="primary" @click="showAddDialog">
+          <template #icon><AddIcon /></template>
+          添加场景
+        </t-button>
+        <t-button variant="outline" @click="toggleSelectionMode">
+            批量管理
+        </t-button>
       </template>
       <template v-else>
+         <div class="toolbar-left"></div>
          <t-space>
            <t-button variant="outline" @click="toggleSelectionMode">取消</t-button>
            <t-button variant="outline" @click="toggleSelectAll">
@@ -34,35 +33,41 @@
           class="scene-card" 
           :class="{ 'is-selected': selectedSceneIds.includes(scene.id), 'is-selection-mode': isSelectionMode }"
           hover-shadow
-          @click="toggleSelectScene(scene.id)"
+          @click="handleCardClick(scene)"
         >
-           <template #cover>
-             <div class="card-cover">
-               <!-- Selection Overlay -->
-               <div v-if="isSelectionMode" class="selection-overlay">
-                 <CheckCircleIcon v-if="selectedSceneIds.includes(scene.id)" class="check-icon checked" />
-                 <div v-else class="check-circle-outline"></div>
-               </div>
+          <template #cover>
+            <div class="card-cover">
+              <!-- Selection Overlay: Only visible in selection mode -->
+              <div v-if="isSelectionMode" class="selection-overlay">
+                 <CheckCircleFilledIcon v-if="selectedSceneIds.includes(scene.id)" class="check-icon checked" />
+                 <CircleIcon v-else class="check-icon unchecked" />
+              </div>
 
-               <img v-if="sceneCovers[scene.id]" :src="sceneCovers[scene.id]" alt="cover" class="cover-img" />
-               <div v-else class="cover-placeholder">
-                 <ImageIcon size="32" />
-                 <span>暂无图片</span>
-               </div>
-             </div>
-           </template>
-           <div class="scene-info">
-             <h3>{{ scene.name }}</h3>
-             <p class="scene-id">ID: {{ scene.id }}</p>
-           </div>
-           <template #actions v-if="!isSelectionMode">
-             <t-space size="small">
-                <t-button variant="text" theme="default" @click.stop="triggerUpload(scene)">
-                   <template #icon><UploadIcon /></template>
-                   上传图片
+              <img v-if="sceneCovers[scene.id]" :src="sceneCovers[scene.id]" alt="cover" class="cover-img" />
+              <div v-else class="cover-placeholder">
+                <ImageIcon size="32" />
+                <span>暂无图片</span>
+              </div>
+            </div>
+          </template>
+          <div class="scene-info">
+            <div class="scene-text">
+              <h3>{{ scene.name }}</h3>
+              <p class="scene-id">ID: {{ scene.id }}</p>
+            </div>
+            <div class="scene-actions" v-if="!isSelectionMode">
+              <t-dropdown 
+                :options="getDropdownOptions(scene)" 
+                :min-column-width="160"
+                :popup-props="{ overlayStyle: { width: '180px' } }"
+                @click="(data) => handleAction(data, scene)"
+              >
+                <t-button variant="text" shape="circle" @click.stop>
+                  <template #icon><MoreIcon /></template>
                 </t-button>
-             </t-space>
-           </template>
+              </t-dropdown>
+            </div>
+          </div>
         </t-card>
       </div>
       <div v-else class="empty-state">
@@ -99,13 +104,21 @@
         </t-form-item>
       </t-form>
     </t-dialog>
+
+    <!-- Image Preview: 仅在需要时渲染，避免页面底部出现占位 -->
+    <t-image-viewer
+      v-if="previewVisible"
+      v-model:visible="previewVisible"
+      :images="[previewImage]"
+      @close="previewVisible = false"
+    />
   </div>
 </template>
 
 <script>
-import { computed, ref, onMounted, reactive } from 'vue';
+import { computed, ref, onMounted, reactive, h } from 'vue';
 import { useStore } from 'vuex';
-import { AddIcon, UploadIcon, ImageIcon, DeleteIcon, CheckCircleIcon, CloseCircleIcon } from 'tdesign-icons-vue-next';
+import { AddIcon, UploadIcon, ImageIcon, DeleteIcon, CheckCircleFilledIcon, CircleIcon, MoreIcon } from 'tdesign-icons-vue-next';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
 import apiConfig from '../config/api.json';
 
@@ -118,8 +131,9 @@ export default {
     UploadIcon,
     ImageIcon,
     DeleteIcon,
-    CheckCircleIcon,
-    CloseCircleIcon
+    CheckCircleFilledIcon,
+    CircleIcon,
+    MoreIcon
   },
   setup() {
     const store = useStore();
@@ -137,6 +151,10 @@ export default {
     const sceneCovers = reactive({});
     // 当前正在上传图片的场景ID
     const uploadSceneId = ref(null);
+
+    // 图片预览状态
+    const previewVisible = ref(false);
+    const previewImage = ref('');
 
     const scenes = computed(() => store.getters.scenes || []);
     
@@ -307,6 +325,18 @@ export default {
         selectedSceneIds.value.push(sceneId);
       }
     };
+
+    const handleCardClick = (scene) => {
+      if (isSelectionMode.value) {
+        toggleSelectScene(scene.id);
+      } else {
+        const url = sceneCovers[scene.id];
+        if (url) {
+          previewImage.value = url;
+          previewVisible.value = true;
+        }
+      }
+    };
     
     const isAllSelected = computed(() => {
       return scenes.value.length > 0 && selectedSceneIds.value.length === scenes.value.length;
@@ -350,6 +380,55 @@ export default {
       });
     };
 
+    const handleDeleteScene = (scene) => {
+      const confirmDialog = DialogPlugin.confirm({
+        header: '确认删除',
+        body: `确定要删除场景 "${scene.name}" 吗？此操作不可恢复。`,
+        theme: 'danger',
+        onConfirm: async () => {
+          loading.value = true;
+          confirmDialog.hide();
+          
+          // Use batchDeleteScenes for single deletion as well, or implement a single delete action
+          // Since we have batchDeleteScenes, we can reuse it by passing an array with one ID
+          const res = await store.dispatch('batchDeleteScenes', [scene.id]);
+          
+          loading.value = false;
+          if (res.success) {
+            MessagePlugin.success('删除成功');
+            fetchScenes();
+          } else {
+            MessagePlugin.error('删除失败');
+          }
+        }
+      });
+    };
+
+    const handleAction = (data, scene) => {
+      if (data.value === 'upload') {
+        triggerUpload(scene);
+      } else if (data.value === 'delete') {
+        handleDeleteScene(scene);
+      }
+    };
+
+    const getDropdownOptions = (scene) => {
+      const hasImage = !!sceneCovers[scene.id];
+      return [
+        { 
+          content: hasImage ? '重新上传场景图' : '上传图片', 
+          value: 'upload', 
+          prefixIcon: () => h(UploadIcon) 
+        },
+        {
+          content: '删除场景',
+          value: 'delete',
+          theme: 'error',
+          prefixIcon: () => h(DeleteIcon)
+        }
+      ];
+    };
+
     return {
       scenes,
       loading,
@@ -371,7 +450,13 @@ export default {
       toggleSelectScene,
       isAllSelected,
       toggleSelectAll,
-      handleBatchDelete
+      handleBatchDelete,
+      handleDeleteScene,
+      handleAction,
+      getDropdownOptions,
+      handleCardClick,
+      previewVisible,
+      previewImage
     };
   }
 };
@@ -413,19 +498,29 @@ export default {
   right: 8px;
   z-index: 10;
 }
+.check-icon {
+  font-size: 24px;
+  border-radius: 50%;
+  background-color: #fff; /* White background for better contrast */
+  display: block;
+}
 .check-icon.checked {
   color: var(--td-brand-color);
-  font-size: 24px;
-  background: white;
-  border-radius: 50%;
 }
-.check-circle-outline {
-  width: 22px;
-  height: 22px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background-color: rgba(0,0,0,0.2);
-  box-shadow: 0 0 2px rgba(0,0,0,0.5);
+.check-icon.unchecked {
+  color: var(--td-text-color-secondary); /* Grey outline */
+}
+
+.card-actions {
+  transition: opacity 0.2s;
+  /* Maintain height to prevent layout shift */
+  height: 32px; 
+  display: flex;
+  align-items: center;
+}
+.card-actions.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .card-cover {
@@ -448,14 +543,34 @@ export default {
   color: var(--td-text-color-placeholder);
   gap: 8px;
 }
+.scene-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px;
+}
+.scene-text {
+  flex: 1;
+  min-width: 0; /* Enable truncation in flex item */
+}
 .scene-info h3 {
   margin-bottom: 4px;
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .scene-id {
   color: var(--td-text-color-secondary);
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scene-actions {
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 .empty-state {
   display: flex;
