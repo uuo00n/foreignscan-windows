@@ -1,22 +1,28 @@
 <template>
   <div class="home">
     <header class="app-header">
-      <div class="logo">智能防务检测系统</div>
+      <div class="header-left">
+        <t-button theme="default" variant="text" shape="square" @click="toggleSidebar">
+          <ViewListIcon size="20" />
+        </t-button>
+        <div class="logo">智能防务检测系统</div>
+      </div>
       <div class="actions">
         <!-- 使用 TDesign 按钮组件替换原生按钮 -->
         <!-- 说明：后续可在 @click 里绑定筛选或启动逻辑 -->
         <t-space size="small">
-          <t-button type="primary" @click="startSelectedDetect">开始</t-button>
+          <t-button type="primary" @click="startSelectedDetect" v-if="activeMenu === 'home'">开始</t-button>
           <!-- <t-button theme="success">合格</t-button> -->
           <!-- <t-button theme="danger">缺陷</t-button> -->
           <t-button
             :theme="isBatchMode ? 'primary' : 'default'"
             variant="outline"
             @click="toggleBatchMode"
+            v-if="activeMenu === 'home'"
           >
             {{ isBatchMode ? '退出批量' : '批量处理' }}
           </t-button>
-          <t-button shape="circle" theme="primary" @click="refreshList" title="刷新列表">
+          <t-button shape="circle" theme="primary" @click="refreshList" title="刷新列表" v-if="activeMenu === 'home'">
             <RefreshIcon size="16" />
           </t-button>
         </t-space>
@@ -24,30 +30,40 @@
     </header>
     
     <main class="app-content">
-      <div class="sidebar">
-        <InspectionList ref="inspectionList" />
-      </div>
-      <div class="main-content">
-        <ImageViewer />
-        <div class="jobs-panel" v-if="false && Object.keys(detectJobs || {}).length > 0">
-          <h4 class="jobs-title">识别任务进度</h4>
-          <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
-            <div class="job-row">
-              <div class="job-id">{{ job.ID }}</div>
-              <div class="job-status">{{ job.Status }}</div>
-              <div class="job-message">{{ job.Message }}</div>
-              <t-button size="small" theme="danger" variant="outline" @click="cancelJob(job.ID)" v-if="!['completed','failed','canceled'].includes(job.Status)">取消</t-button>
+      <SideMenu :value="activeMenu" @change="handleMenuChange" />
+      
+      <!-- Home View (Inspection) -->
+      <div class="view-container home-view" v-show="activeMenu === 'home'">
+        <div class="sidebar">
+          <InspectionList ref="inspectionList" />
+        </div>
+        <div class="main-content">
+          <ImageViewer />
+          <div class="jobs-panel" v-if="false && Object.keys(detectJobs || {}).length > 0">
+            <h4 class="jobs-title">识别任务进度</h4>
+            <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
+              <div class="job-row">
+                <div class="job-id">{{ job.ID }}</div>
+                <div class="job-status">{{ job.Status }}</div>
+                <div class="job-message">{{ job.Message }}</div>
+                <t-button size="small" theme="danger" variant="outline" @click="cancelJob(job.ID)" v-if="!['completed','failed','canceled'].includes(job.Status)">取消</t-button>
+              </div>
+              <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
             </div>
-            <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
           </div>
         </div>
+        <!-- 右侧检测结果面板：默认隐藏，点击“检测结果”后以动画滑入展示 -->
+        <transition name="results-slide">
+          <div class="results-panel" v-if="showResultsPanel">
+            <DetectionResults />
+          </div>
+        </transition>
       </div>
-      <!-- 右侧检测结果面板：默认隐藏，点击“检测结果”后以动画滑入展示 -->
-      <transition name="results-slide">
-        <div class="results-panel" v-if="showResultsPanel">
-          <DetectionResults />
-        </div>
-      </transition>
+
+      <!-- Scene Preview View -->
+      <div class="view-container scene-view" v-if="activeMenu === 'scene-preview'">
+        <ScenePreview />
+      </div>
 
       <!-- 识别任务进度弹窗：使用 TDesign Dialog 美化显示 -->
       <t-dialog
@@ -140,16 +156,19 @@
 import InspectionList from '@/components/InspectionList.vue';
 import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
+import SideMenu from '@/components/SideMenu.vue';
+import ScenePreview from '@/components/ScenePreview.vue';
 import { mapState } from 'vuex';
 import { MessagePlugin } from 'tdesign-vue-next';
 // 引入 TDesign 图标库中的日历图标
-import { CalendarIcon, RefreshIcon } from 'tdesign-icons-vue-next';
+import { CalendarIcon, RefreshIcon, ViewListIcon } from 'tdesign-icons-vue-next';
 
 export default {
   data() {
     return {
       // 控制识别进度弹窗显示/隐藏
       jobsDialogVisible: false,
+      activeMenu: 'home'
     };
   },
   name: 'HomeView',
@@ -158,7 +177,10 @@ export default {
     ImageViewer,
     DetectionResults,
     CalendarIcon,
-    RefreshIcon
+    RefreshIcon,
+    ViewListIcon,
+    SideMenu,
+    ScenePreview
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
@@ -191,6 +213,12 @@ export default {
     }
   },
   methods: {
+    toggleSidebar() {
+      this.$store.commit('TOGGLE_SIDEBAR');
+    },
+    handleMenuChange(value) {
+      this.activeMenu = value;
+    },
     // 跳转到按日期查看检测列表的页面
     goToDateView() {
       // 使用命名路由，便于维护
@@ -369,6 +397,29 @@ export default {
   display: flex;
   overflow: hidden;
   position: relative;
+}
+
+.view-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+}
+
+.home-view {
+  flex-direction: row;
+}
+
+.scene-view {
+  flex-direction: column;
+  background-color: var(--td-bg-color-page);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .sidebar {

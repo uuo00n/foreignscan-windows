@@ -113,14 +113,31 @@ export default createStore({
     // 批量处理模式状态
     isBatchMode: false,
     // 批量选择选中的记录ID集合
-    batchSelectedIds: []
+    batchSelectedIds: [],
+    // 侧边栏折叠状态
+    sidebarCollapsed: false,
+    // 场景列表
+    scenes: [],
+    // 当前选中的场景
+    activeSceneId: null
   },
   getters: {
     hasBackendError: state => state.backendStatus === 'error',
     isBatchMode: state => state.isBatchMode,
-    batchSelectedIds: state => state.batchSelectedIds
+    batchSelectedIds: state => state.batchSelectedIds,
+    sidebarCollapsed: state => state.sidebarCollapsed,
+    scenes: state => state.scenes
   },
   mutations: {
+    TOGGLE_SIDEBAR(state) {
+      state.sidebarCollapsed = !state.sidebarCollapsed;
+    },
+    SET_SCENES(state, scenes) {
+      state.scenes = scenes;
+    },
+    ADD_SCENE(state, scene) {
+      state.scenes.push(scene);
+    },
     SET_INSPECTION_RECORDS(state, records) {
       state.inspectionRecords = records;
     },
@@ -251,6 +268,47 @@ export default createStore({
     // 获取场景名称映射：兼容两种返回结构
     // 1) { scenes: [{ id: 'hinge', name: '铰链' }, ...] }
     // 2) { map: { hinge: '铰链', ... } } 或直接返回 { hinge: '铰链', ... }
+    // 获取样式图片列表（场景预览）
+    async fetchStyleImages({ commit }) {
+      try {
+        // 根据用户指示，尝试使用 /style-images 接口
+        const response = await fetch(API_BASE + 'api/style-images');
+        const data = await response.json();
+        
+        if (response.ok) {
+          // 假设返回结构为数组或包含列表的对象
+          let list = [];
+          if (Array.isArray(data)) {
+            list = data;
+          } else if (data && Array.isArray(data.styleImages)) {
+            list = data.styleImages;
+          } else if (data && Array.isArray(data.images)) {
+            list = data.images;
+          }
+          
+          return list;
+        }
+        return [];
+      } catch (error) {
+        console.error('获取样式图片失败:', error);
+        return [];
+      }
+    },
+    // 获取指定场景的样式图片
+    async fetchStyleImagesByScene({ commit }, sceneId) {
+      try {
+        if (!sceneId) return [];
+        const response = await fetch(`${API_BASE}api/style-images/scene/${sceneId}`);
+        const data = await response.json();
+        if (response.ok && data.success && Array.isArray(data.styleImages)) {
+          return data.styleImages;
+        }
+        return [];
+      } catch (error) {
+        console.error(`获取场景[${sceneId}]样式图片失败:`, error);
+        return [];
+      }
+    },
     async fetchSceneNameMap({ commit, dispatch }) {
       try {
         // 确保后端健康：如果之前未检测过，先尝试健康检查，但不强制依赖
@@ -263,8 +321,10 @@ export default createStore({
         const data = await response.json();
 
         let map = {};
+        let scenesList = [];
         if (response.ok) {
           if (data && Array.isArray(data.scenes)) {
+            scenesList = data.scenes;
             // 数组结构：转换为 map
             map = data.scenes.reduce((acc, s) => {
               if (s && (s.id != null) && s.name) {
@@ -274,21 +334,91 @@ export default createStore({
             }, {});
           } else if (data && data.map && typeof data.map === 'object') {
             map = data.map;
+            // 如果返回的是map，尝试构建简单的scenesList
+            scenesList = Object.keys(map).map(k => ({ id: k, name: map[k] }));
           } else if (data && typeof data === 'object') {
             // 直接返回 map 的情况
             map = data;
+             scenesList = Object.keys(map).map(k => ({ id: k, name: map[k] }));
           }
           commit('SET_SCENE_NAME_MAP', map || {});
+          commit('SET_SCENES', scenesList || []);
           return map || {};
         } else {
           commit('SET_SCENE_NAME_MAP', {});
+          commit('SET_SCENES', []);
           return {};
         }
       } catch (error) {
         console.error('获取场景映射失败:', error);
         commit('SET_SCENE_NAME_MAP', {});
+        commit('SET_SCENES', []);
         return {};
       }
+    },
+    // 添加新场景
+    async addScene({ commit }, sceneData) {
+      try {
+         const response = await fetch(API_BASE + 'api/scenes', {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json'
+           },
+           body: JSON.stringify(sceneData)
+         });
+         const data = await response.json();
+         if (response.ok) {
+           return { success: true, data };
+         } else {
+           return { success: false, message: data.message || '添加场景失败' };
+         }
+      } catch (error) {
+        console.error('添加场景失败:', error);
+        return { success: false, message: error.message };
+      }
+    },
+    // 上传图片（样式图）
+    async uploadImage({ commit }, { file, sceneId }) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (sceneId) {
+          formData.append('sceneId', sceneId);
+        }
+        
+        // 样式图上传接口
+        const response = await fetch(API_BASE + 'api/style-images', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+          return { success: true, data };
+        } else {
+          return { success: false, message: data.message || '上传失败' };
+        }
+      } catch (error) {
+        console.error('上传图片失败:', error);
+        return { success: false, message: error.message };
+      }
+    },
+    // 获取指定场景的图片列表（不更新 store，仅返回数据）
+    async fetchSceneImages({ dispatch }, sceneId) {
+       try {
+        const qs = new URLSearchParams();
+        if (sceneId) qs.set('sceneId', sceneId);
+        const url = `${API_BASE}api/images/filter?${qs.toString()}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (response.ok) {
+           return Array.isArray(data.images) ? data.images : (Array.isArray(data.list) ? data.list : []);
+        }
+        return [];
+       } catch (error) {
+         console.error('获取场景图片失败', error);
+         return [];
+       }
     },
     // 健康检查接口
     async checkBackendHealth({ commit }) {
