@@ -2,6 +2,23 @@ const { defineConfig } = require('@vue/cli-service')
 
 module.exports = defineConfig({
   transpileDependencies: true,
+  // 解决 copy-webpack-plugin 和 html-webpack-plugin 的 index.html 冲突
+  chainWebpack: config => {
+    config.plugin('copy').tap(args => {
+      if (args[0].patterns && args[0].patterns.length > 0) {
+        if (!args[0].patterns[0].globOptions) {
+          args[0].patterns[0].globOptions = {};
+        }
+        if (!args[0].patterns[0].globOptions.ignore) {
+          args[0].patterns[0].globOptions.ignore = [];
+        }
+        if (!args[0].patterns[0].globOptions.ignore.includes('**/index.html')) {
+          args[0].patterns[0].globOptions.ignore.push('**/index.html');
+        }
+      }
+      return args;
+    });
+  },
   // 设置开发服务器端口为8080
   devServer: {
     port: 8080
