@@ -1,7 +1,7 @@
 <template>
   <div class="date-list-page">
     <!-- 页面头部：桌面端缺少系统返回按钮，这里提供返回首页与标题 -->
-    <header class="date-header">
+    <header class="date-header" v-if="!isEmbedded">
       <div class="left">
         <!-- 返回首页按钮：改为主色填充的圆形按钮，增强可见性 -->
         <t-button class="back-btn" theme="primary" shape="circle" size="medium" @click="goBack" title="返回首页">
@@ -11,7 +11,7 @@
       </div>
     </header>
     <!-- 顶部筛选：日期选择模式 + 日期选择 + 场景选择 + 刷新按钮 -->
-    <t-card>
+    <t-card :bordered="false" :class="{ 'embedded-card': isEmbedded }">
       <div class="filters">
         <!-- 模式切换：单日 / 范围 -->
         <t-radio-group v-model="dateMode" variant="default-filled" @change="onModeChange">
@@ -386,7 +386,8 @@ export default {
       selectedScene: '',
       // 分页相关：当前页与每页数量（默认 10 条）
       currentPage: 1,
-      pageSize: 10
+      pageSize: 10,
+      isEmbedded: false
     };
   },
   watch: {
@@ -399,6 +400,15 @@ export default {
     }
   },
   async mounted() {
+    // 判断是否在 iframe 中
+    try {
+      if (window.self !== window.top) {
+        this.isEmbedded = true;
+      }
+    } catch (e) {
+      this.isEmbedded = true;
+    }
+
     // 加载场景映射
     await this.fetchSceneNameMap();
     // 进入页面时加载数据
@@ -413,6 +423,16 @@ export default {
   flex-direction: column;
   height: 100%;
   padding: 12px;
+  background-color: var(--td-bg-color-page);
+}
+
+.embedded-card {
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.embedded-card :deep(.t-card__body) {
+  padding: 0 !important;
 }
 
 .date-header {

@@ -19,6 +19,12 @@
         </template>
         场景预览
       </t-menu-item>
+      <t-menu-item value="date-list">
+        <template #icon>
+          <CalendarIcon />
+        </template>
+        日期列表
+      </t-menu-item>
     </t-menu>
   </div>
 </template>
@@ -26,13 +32,14 @@
 <script>
 import { computed } from 'vue';
 import { useStore } from 'vuex';
-import { DashboardIcon, AppIcon } from 'tdesign-icons-vue-next';
+import { DashboardIcon, AppIcon, CalendarIcon } from 'tdesign-icons-vue-next';
 
 export default {
   name: 'SideMenu',
   components: {
     DashboardIcon,
-    AppIcon
+    AppIcon,
+    CalendarIcon
   },
   props: {
     value: {

@@ -65,6 +65,15 @@
         <ScenePreview />
       </div>
 
+      <!-- Date List View (Embedded) -->
+      <div class="view-container date-view" v-if="activeMenu === 'date-list'">
+        <iframe 
+          src="#/by-date" 
+          style="width: 100%; height: 100%; border: none;"
+          title="Date List"
+        ></iframe>
+      </div>
+
       <!-- 识别任务进度弹窗：使用 TDesign Dialog 美化显示 -->
       <t-dialog
         v-model:visible="jobsDialogVisible"
@@ -132,20 +141,6 @@
         </template>
         <t-button class="progress-btn" variant="outline" size="small" theme="primary" shape="round" @click="openJobsDialog" title="查看识别任务进度">
           任务进度
-        </t-button>
-      </div>
-      <!-- 底部右侧的操作区域：放置日期跳转按钮 -->
-      <div class="footer-action">
-        <t-button
-          class="calendar-btn"
-          shape="circle"
-          size="medium"
-          theme="primary"
-          @click="goToDateView"
-          title="按日期查看检测列表"
-        >
-          <!-- 使用 TDesign 图标库的日历图标 -->
-          <CalendarIcon size="20" />
         </t-button>
       </div>
     </footer>
@@ -218,11 +213,6 @@ export default {
     },
     handleMenuChange(value) {
       this.activeMenu = value;
-    },
-    // 跳转到按日期查看检测列表的页面
-    goToDateView() {
-      // 使用命名路由，便于维护
-      this.$router.push({ name: 'dateList' });
     },
     refreshList() {
       const tab = this.$store.state.listActiveTab || 'all';
