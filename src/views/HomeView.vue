@@ -32,46 +32,56 @@
     <main class="app-content">
       <SideMenu :value="activeMenu" @change="handleMenuChange" />
       
-      <!-- Home View (Inspection) -->
-      <div class="view-container home-view" v-show="activeMenu === 'home'">
-        <div class="sidebar">
-          <InspectionList ref="inspectionList" />
-        </div>
-        <div class="main-content">
-          <ImageViewer />
-          <div class="jobs-panel" v-if="false && Object.keys(detectJobs || {}).length > 0">
-            <h4 class="jobs-title">识别任务进度</h4>
-            <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
-              <div class="job-row">
-                <div class="job-id">{{ job.ID }}</div>
-                <div class="job-status">{{ job.Status }}</div>
-                <div class="job-message">{{ job.Message }}</div>
-                <t-button size="small" theme="danger" variant="outline" @click="cancelJob(job.ID)" v-if="!['completed','failed','canceled'].includes(job.Status)">取消</t-button>
-              </div>
-              <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
+      <!-- 内容区域容器，用于绝对定位叠加 -->
+      <div class="content-area">
+        <!-- Home View (Inspection) -->
+        <transition name="fade-transform">
+          <div class="view-container home-view" v-show="activeMenu === 'home'">
+            <div class="sidebar">
+              <InspectionList ref="inspectionList" />
             </div>
-          </div>
-        </div>
-        <!-- 右侧检测结果面板：默认隐藏，点击“检测结果”后以动画滑入展示 -->
-        <transition name="results-slide">
-          <div class="results-panel" v-if="showResultsPanel">
-            <DetectionResults />
+            <div class="main-content">
+              <ImageViewer />
+              <div class="jobs-panel" v-if="false && Object.keys(detectJobs || {}).length > 0">
+                <h4 class="jobs-title">识别任务进度</h4>
+                <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
+                  <div class="job-row">
+                    <div class="job-id">{{ job.ID }}</div>
+                    <div class="job-status">{{ job.Status }}</div>
+                    <div class="job-message">{{ job.Message }}</div>
+                    <t-button size="small" theme="danger" variant="outline" @click="cancelJob(job.ID)" v-if="!['completed','failed','canceled'].includes(job.Status)">取消</t-button>
+                  </div>
+                  <t-progress :percentage="calcProgress(job)" :status="progressStatus(job)" />
+                </div>
+              </div>
+            </div>
+            <!-- 右侧检测结果面板：默认隐藏，点击“检测结果”后以动画滑入展示 -->
+            <transition name="results-slide">
+              <div class="results-panel" v-if="showResultsPanel">
+                <DetectionResults />
+              </div>
+            </transition>
           </div>
         </transition>
-      </div>
 
-      <!-- Scene Preview View -->
-      <div class="view-container scene-view" v-if="activeMenu === 'scene-preview'">
-        <ScenePreview />
-      </div>
+        <!-- Scene Preview View -->
+        <transition name="fade-transform">
+          <div class="view-container scene-view" v-if="activeMenu === 'scene-preview'">
+            <ScenePreview />
+          </div>
+        </transition>
 
-      <!-- Date List View (Embedded) -->
-      <div class="view-container date-view" v-if="activeMenu === 'date-list'">
-        <iframe 
-          src="#/by-date" 
-          style="width: 100%; height: 100%; border: none;"
-          title="Date List"
-        ></iframe>
+        <!-- Date List View (Embedded) -->
+        <!-- 使用 v-show 避免 iframe 频繁重载，提升体验 -->
+        <transition name="fade-transform">
+          <div class="view-container date-view" v-show="activeMenu === 'date-list'">
+            <iframe 
+              src="#/by-date" 
+              style="width: 100%; height: 100%; border: none;"
+              title="Date List"
+            ></iframe>
+          </div>
+        </transition>
       </div>
 
       <!-- 识别任务进度弹窗：使用 TDesign Dialog 美化显示 -->
@@ -406,12 +416,38 @@ export default {
   position: relative;
 }
 
-.view-container {
+.content-area {
   flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--td-bg-color-page);
+}
+
+.view-container {
+  /* 修改为绝对定位以支持过渡动画叠加 */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   overflow: hidden;
-  position: relative;
-  height: 100%;
+}
+
+/* 页面切换动画：淡入淡出 + 轻微位移 */
+.fade-transform-leave-active,
+.fade-transform-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: translateX(-15px);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateX(15px);
 }
 
 .home-view {

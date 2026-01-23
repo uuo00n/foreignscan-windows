@@ -19,25 +19,30 @@
           <t-radio-button value="range">范围</t-radio-button>
         </t-radio-group>
 
-        <!-- 选择单日 -->
-        <t-date-picker
-          v-if="dateMode === 'single'"
-          v-model="singleDate"
-          placeholder="选择日期"
-          clearable
-          @change="onFilterChange"
-          style="width: 180px"
-        />
+        <!-- 日期选择区域动画 -->
+        <transition name="fade" mode="out-in">
+          <!-- 选择单日 -->
+          <div v-if="dateMode === 'single'" key="single">
+            <t-date-picker
+              v-model="singleDate"
+              placeholder="选择日期"
+              clearable
+              @change="onFilterChange"
+              style="width: 180px"
+            />
+          </div>
 
-        <!-- 选择日期范围 -->
-        <t-date-range-picker
-          v-else
-          v-model="dateRange"
-          placeholder="选择日期范围"
-          clearable
-          @change="onFilterChange"
-          style="width: 260px"
-        />
+          <!-- 选择日期范围 -->
+          <div v-else key="range">
+            <t-date-range-picker
+              v-model="dateRange"
+              placeholder="选择日期范围"
+              clearable
+              @change="onFilterChange"
+              style="width: 260px"
+            />
+          </div>
+        </transition>
 
         <!-- 选择场景 -->
         <t-select
@@ -65,65 +70,69 @@
 
     <!-- 列表区域：显示后端返回的数据 -->
     <div class="content">
-      <!-- 场景最新状态概览卡片 -->
-      <t-card v-if="selectedScene && currentSceneLatestInfo" :bordered="false" class="scene-status-card">
-        <div class="scene-status-row">
-          <div class="status-left">
-            <span class="label">当前场景状态：</span>
-            <t-tag :theme="sceneLatestTheme" variant="light" size="large">
-              {{ sceneLatestText }}
-            </t-tag>
-            <span class="sub-label" v-if="currentSceneLatestInfo.latestImage">
-              (最新更新: {{ formatTime(currentSceneLatestInfo.latestImage.createdAt) }})
-            </span>
-          </div>
-          <div class="status-right" v-if="currentSceneLatestInfo.latestImage">
-            <t-button variant="text" theme="primary" @click="viewLatestImage">查看最新图片</t-button>
-          </div>
-        </div>
-      </t-card>
-
-      <t-list v-if="inspectionRecords.length > 0" split>
-        <t-list-item
-          v-for="record in pagedRecords"
-          :key="record.id"
-          @click="selectRecord(record)"
-        >
-          <!-- 多行列表样式：顶部主信息（场景 + 状态），底部次级信息（日期与时间） -->
-          <div class="item-col">
-            <!-- 第一行：主信息（场景名称）与状态标签改为左对齐 -->
-            <div class="line-top">
-              <div class="record-title">{{ getSceneName(record) }}</div>
-              <t-tag :theme="statusTheme(record)" variant="light" size="small">
-                {{ getStatusText(record) }}
+      <t-loading :loading="isLoading" text="加载中..." show-overlay>
+        <!-- 场景最新状态概览卡片 -->
+        <t-card v-if="selectedScene && currentSceneLatestInfo" :bordered="false" class="scene-status-card">
+          <div class="scene-status-row">
+            <div class="status-left">
+              <span class="label">当前场景状态：</span>
+              <t-tag :theme="sceneLatestTheme" variant="light" size="large">
+                {{ sceneLatestText }}
               </t-tag>
+              <span class="sub-label" v-if="currentSceneLatestInfo.latestImage">
+                (最新更新: {{ formatTime(currentSceneLatestInfo.latestImage.createdAt) }})
+              </span>
             </div>
-            <!-- 第二行：次级信息（场景名称），单独一行 - 已移除，因为标题已显示场景名 -->
-            <!-- <div class="record-scene">场景：{{ getSceneName(record) }}</div> -->
-            <!-- 第三行：次级信息（日期 + 时间），单独一行 -->
-            <div class="record-subtitle">{{ formatDateValue(record.timestamp) }} {{ formatTime(record.timestamp) }}</div>
+            <div class="status-right" v-if="currentSceneLatestInfo.latestImage">
+              <t-button variant="text" theme="primary" @click="viewLatestImage">查看最新图片</t-button>
+            </div>
           </div>
-        </t-list-item>
-      </t-list>
+        </t-card>
 
-      <!-- 空态：居中显示该筛选条件下无数据 -->
-      <div v-else class="empty">
-        <t-empty description="暂无数据" />
-      </div>
+        <t-list v-if="inspectionRecords.length > 0" split>
+          <transition-group name="list" tag="div">
+            <t-list-item
+              v-for="record in pagedRecords"
+              :key="record.id"
+              @click="selectRecord(record)"
+            >
+              <!-- 多行列表样式：顶部主信息（场景 + 状态），底部次级信息（日期与时间） -->
+              <div class="item-col">
+                <!-- 第一行：主信息（场景名称）与状态标签改为左对齐 -->
+                <div class="line-top">
+                  <div class="record-title">{{ getSceneName(record) }}</div>
+                  <t-tag :theme="statusTheme(record)" variant="light" size="small">
+                    {{ getStatusText(record) }}
+                  </t-tag>
+                </div>
+                <!-- 第二行：次级信息（场景名称），单独一行 - 已移除，因为标题已显示场景名 -->
+                <!-- <div class="record-scene">场景：{{ getSceneName(record) }}</div> -->
+                <!-- 第三行：次级信息（日期 + 时间），单独一行 -->
+                <div class="record-subtitle">{{ formatDateValue(record.timestamp) }} {{ formatTime(record.timestamp) }}</div>
+              </div>
+            </t-list-item>
+          </transition-group>
+        </t-list>
 
-      <!-- 底部分页：仅在有数据时显示，支持切换页码与每页数量 -->
-      <div v-if="inspectionRecords.length > 0" class="pagination-bar">
-        <!-- 使用 v-model 绑定当前页与每页数量；同时监听 change 以在部分版本中兼容 -->
-        <t-pagination
-          :total="inspectionRecords.length"
-          v-model:current="currentPage"
-          v-model:pageSize="pageSize"
-          :pageSizeOptions="[10, 20, 50]"
-          :showJumper="true"
-          :showPageSize="true"
-          @change="handlePaginationChange"
-        />
-      </div>
+        <!-- 空态：居中显示该筛选条件下无数据 -->
+        <div v-else class="empty">
+          <t-empty description="暂无数据" />
+        </div>
+
+        <!-- 底部分页：仅在有数据时显示，支持切换页码与每页数量 -->
+        <div v-if="inspectionRecords.length > 0" class="pagination-bar">
+          <!-- 使用 v-model 绑定当前页与每页数量；同时监听 change 以在部分版本中兼容 -->
+          <t-pagination
+            :total="inspectionRecords.length"
+            v-model:current="currentPage"
+            v-model:pageSize="pageSize"
+            :pageSizeOptions="[10, 20, 50]"
+            :showJumper="true"
+            :showPageSize="true"
+            @change="handlePaginationChange"
+          />
+        </div>
+      </t-loading>
     </div>
   </div>
 </template>
@@ -158,34 +167,39 @@ export default {
       this.$router.push({ name: 'home' });
     },
     async refresh() {
-      // 准备筛选参数
-      const params = {
-        status: 'all', // 默认获取全部状态
-      };
-      
-      // 根据模式添加日期参数
-      if (this.dateMode === 'single') {
-        if (this.singleDate) {
-          params.start = this.singleDate;
-          params.end = this.singleDate; // 后端会自动扩展为当天的 00:00:00 - 23:59:59
+      this.isLoading = true;
+      try {
+        // 准备筛选参数
+        const params = {
+          status: 'all', // 默认获取全部状态
+        };
+        
+        // 根据模式添加日期参数
+        if (this.dateMode === 'single') {
+          if (this.singleDate) {
+            params.start = this.singleDate;
+            params.end = this.singleDate; // 后端会自动扩展为当天的 00:00:00 - 23:59:59
+          }
+        } else {
+          // 范围模式
+          if (this.dateRange && this.dateRange.length === 2) {
+            params.start = this.dateRange[0];
+            params.end = this.dateRange[1];
+          }
         }
-      } else {
-        // 范围模式
-        if (this.dateRange && this.dateRange.length === 2) {
-          params.start = this.dateRange[0];
-          params.end = this.dateRange[1];
+        
+        // 添加场景参数
+        if (this.selectedScene) {
+          params.sceneId = this.selectedScene;
         }
-      }
-      
-      // 添加场景参数
-      if (this.selectedScene) {
-        params.sceneId = this.selectedScene;
-      }
 
-      // 调用后端筛选接口
-      await this.fetchImagesByFilter(params);
-      // 刷新数据后重置为第一页
-      this.currentPage = 1;
+        // 调用后端筛选接口
+        await this.fetchImagesByFilter(params);
+        // 刷新数据后重置为第一页
+        this.currentPage = 1;
+      } finally {
+        this.isLoading = false;
+      }
     },
     async exportReport() {
       // 导出异常报告：基于当前日期/场景筛选条件，强制状态为异常
@@ -383,7 +397,8 @@ export default {
       // 分页相关：当前页与每页数量（默认 10 条）
       currentPage: 1,
       pageSize: 10,
-      isEmbedded: false
+      isEmbedded: false,
+      isLoading: false
     };
   },
   watch: {
@@ -552,5 +567,27 @@ export default {
 .back-btn {
   /* 提高可见性与可点击性 */
   box-shadow: 0 4px 12px rgba(0, 82, 217, 0.2);
+}
+
+/* 动画样式 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.3s ease;
+}
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
 }
 </style>
