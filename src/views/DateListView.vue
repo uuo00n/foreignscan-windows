@@ -371,19 +371,13 @@ export default {
     }
   },
   data() {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = (today.getMonth() + 1).toString().padStart(2, '0');
-    const d = today.getDate().toString().padStart(2, '0');
-    const todayStr = `${y}-${m}-${d}`;
-
     return {
       // 日期模式：'single' | 'range'
       dateMode: 'single',
-      // 单日日期，默认选中今天
-      singleDate: todayStr,
-      // 日期范围，默认选中今天
-      dateRange: [todayStr, todayStr],
+      // 单日日期，默认不选中
+      singleDate: '',
+      // 日期范围，默认不选中
+      dateRange: [],
       // 选中的场景ID
       selectedScene: '',
       // 分页相关：当前页与每页数量（默认 10 条）
