@@ -1,116 +1,88 @@
-# ForeignScan 异物检测系统
+# ForeignScan Desktop
 
-ForeignScan 是一个用于工业异物检测的桌面应用程序。前端使用 Electron + Vue 构建，后端使用 Go 独立部署提供服务。应用能够接收、处理和分析图像，检测可能存在的异物或缺陷，并以可视化形式展示结果。
+![Private](https://img.shields.io/badge/Repository-Private-red)
+![Vue](https://img.shields.io/badge/Vue.js-3.x-4FC08D?style=flat&logo=vue.js)
+![Electron](https://img.shields.io/badge/Electron-16.x-47848F?style=flat&logo=electron)
+![Platform](https://img.shields.io/badge/Platform-Win%20|%20Mac%20|%20Linux-lightgrey)
+![Copyright](https://img.shields.io/badge/Copyright-2026_uuo00n-blue)
 
-## 功能特点
+**ForeignScan Desktop** 是一款专为工业质量检测设计的跨平台桌面应用程序。结合了 Electron 的跨平台能力与 Vue 3 的响应式体验，为异物检测操作提供了一个直观且高效的终端。
 
-- 图像管理：通过后端服务获取并展示检测图像列表
-- 异物检测：触发后端检测并展示检测结果（位置、类型、置信度等）
-- 结果可视化：在图片上叠加标记框，直观展示检测区域
-- 历史记录：保存和查看历史检测记录
-- 跨平台支持：基于 Electron 构建，支持 Windows、macOS 和 Linux
-- 友好错误提示：后端异常时展示清晰的错误信息
+---
+
+## 项目简介
+
+作为 ForeignScan 系统的前端界面，本应用旨在简化复杂的检测流程。操作人员可以轻松查看实时检测画面、管理历史记录，并获得直观的视觉反馈（如缺陷边界框标注）。
+
+## 主要功能
+
+- **跨平台支持**：在 Windows、macOS 和 Linux 上完美运行。
+- **可视化检测**：在图像上实时叠加检测结果（边界框）。
+- **历史追踪**：强大的历史记录筛选与查询功能，支持按时间和场景查找。
+- **高效交互**：基于 Vue 3 构建的现代 UI，确保流畅快速的响应。
+- **异常处理**：完善的错误提示与状态反馈机制。
 
 ## 技术栈
 
-- 前端：Vue 3, Vuex, Vue Router
-- 桌面应用：Electron
-- 后端：Go（独立部署）
-- 通信：HTTP（由 Go 后端提供）
+- **核心框架**: Vue 3 + Vuex
+- **桌面容器**: Electron
+- **路由管理**: Vue Router
+- **构建工具**: Vite / Webpack
 
-## 安装与运行
+## 快速开始
 
-### 前提条件
+### 前置要求
 
-- Node.js（推荐 v18）
-- npm（通常随 Node.js 一起安装）
-- 已部署并运行的 Go 后端服务（接口细节请参考后端文档）
+- **Node.js**: 推荐 v18+
+- **Go 后端**: 后端服务必须正在运行 (默认 `http://localhost:3000`)
 
-### 安装步骤
+### 1. 安装依赖
 
-1. 克隆仓库到本地
-   ```
-   git clone <仓库地址>
-   cd foreignscan-windows
-   ```
-2. 安装依赖
-   ```
-   npm install
-   ```
-3. 启动 Electron 应用（开发模式）
-   ```
-   npm run electron:serve
-   ```
+```bash
+npm install
+```
 
-### 构建桌面应用
+### 2. 开发模式运行
+
+```bash
+npm run electron:serve
+```
+
+### 3. 生产环境构建
 
 ```bash
 npm run electron:build
 ```
 
-## 后端说明（Go）
-- 开发环境默认连接到 `http://172.20.10.2:3000/`，如需修改后端地址，请编辑 `src/config/api.json` 的 API_BASE 字段（前端与 Electron 主进程统一读取）。
+## 配置说明
 
-- 当前项目的后端由 Go 实现并独立部署，前端通过 HTTP 与后端交互。
-- README 不再包含具体接口定义；请以后端团队提供的文档为准（包括地址、鉴权与数据格式）。
+后端地址配置位于 `src/config/api.json`。如需修改后端地址，请编辑此文件：
 
-## 错误处理
-
-应用程序实现了完善的错误处理机制：
-
-1. 后端连接失败：显示“后端异常”提示，并引导重试
-2. 数据为空：列表区域显示“暂无数据”空态
-3. 图片加载失败：显示友好的错误信息，避免应用崩溃
-
-## 开发说明
-
-### 环境地址配置
-
-- 默认后端地址为 `http://localhost:3000`
-
-### 调试
-
-- 开发模式下，Electron 应用会自动打开开发者工具
-- 可在控制台查看网络请求与错误日志，定位问题
+```json
+{
+  "API_BASE": "http://localhost:3000/"
+}
+```
 
 ## 项目结构
 
-```
+```text
 foreignscan-windows/
-├── .idea/               # IDE配置文件
-├── .trae/               # Trae IDE配置文件
-├── electron/            # Electron 应用相关文件
-│   ├── main.js          # Electron 主进程
-│   └── preload.js       # 预加载脚本
-├── public/              # 静态资源
-│   ├── hinge-example.jpg
-│   └── index.html
-├── src/                 # 前端源代码
-│   ├── assets/          # 静态资源
-│   │   └── hinge-example.jpg
+├── electron/            # Electron 主进程
+├── src/
 │   ├── components/      # Vue 组件
-│   │   ├── DetectionResults.vue
-│   │   ├── ImageViewer.vue
-│   │   └── InspectionList.vue
-│   ├── config/          # 配置文件
-│   │   └── api.json
-│   ├── router/          # 路由配置
-│   │   └── index.js
-│   ├── store/           # Vuex 状态管理
-│   │   └── index.js
 │   ├── views/           # 页面视图
-│   │   ├── DateListView.vue
-│   │   └── HomeView.vue
-│   ├── App.vue
-│   └── main.js
-├── .gitignore           # Git忽略文件
-├── .npmrc               # npm配置文件
-├── README.md            # 项目说明
-├── package-lock.json    # 依赖版本锁定文件
-├── package.json         # 项目配置
-└── vue.config.js        # Vue配置文件
+│   ├── store/           # 状态管理
+│   ├── router/          # 路由配置
+│   └── config/          # 配置文件
+├── public/              # 静态资源
+└── package.json         # 项目依赖
 ```
 
-## 许可证
+## 版权与许可
 
-[MIT](LICENSE)
+本项目为专有软件。**非开源**。
+
+Copyright © 2026 uuo00n. 保留所有权利。
+
+严禁通过任何媒介未经授权复制、修改、分发或使用本软件。
