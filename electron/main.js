@@ -105,7 +105,7 @@ ipcMain.handle('get-images', async () => {
 ipcMain.handle('run-detection', async (event, { imageId }) => {
   try {
     const response = await fetch(API_BASE + `api/images/${imageId}/detections`);
-    
+
     if (response.ok) {
       const data = await response.json();
       return data.detections || [];

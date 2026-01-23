@@ -6,6 +6,7 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
+    "test": "vitest",
     "electron:serve": "cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron .",
     "electron:build": "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder"
   },
@@ -21,13 +22,17 @@
     "vuex": "^4.1.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
     "@vue/cli-service": "^5.0.9",
+    "@vue/test-utils": "^2.4.6",
     "cross-env": "^7.0.3",
     "electron": "^16.2.8",
     "electron-builder": "^23.0.0",
     "html-webpack-plugin": "^5.6.4",
+    "jsdom": "^26.1.0",
     "sass": "^1.56.0",
-    "sass-loader": "^13.2.0"
+    "sass-loader": "^13.2.0",
+    "vitest": "^3.2.4"
   },
   "keywords": [],
   "author": "",

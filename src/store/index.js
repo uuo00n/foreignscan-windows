@@ -56,7 +56,7 @@ const normalizeDetections = (raw) => {
     // 但根据之前逻辑，这里主要处理 detections[i].items
     // 同时也尝试从 det 这一层提取时间（如果是数组结构，det 就是顶层项）
     const detTime = det.updatedAt || det.timestamp || det.time || det.CreatedAt || det.UpdatedAt || det.created_at || det.updated_at || commonTime;
-    
+
     if (det && Array.isArray(det.items) && det.items.length > 0) {
       for (const it of det.items) {
         baseItems.push({ ...it, _fallbackTime: detTime });
@@ -162,7 +162,7 @@ export default createStore({
         // 清空检测结果，避免显示上一个图片的旧数据
         state.detectionResults = [];
         state.processedImagePath = null;
-        
+
         // 逻辑修改：切换记录时，如果面板已经打开，则保持打开（后续逻辑应触发自动获取新数据的请求）
         // 如果面板关闭，则保持关闭
         // 之前的逻辑是 state.showResultsPanel = false; 强制关闭
@@ -274,7 +274,7 @@ export default createStore({
         // 根据用户指示，尝试使用 /style-images 接口
         const response = await fetch(API_BASE + 'api/style-images');
         const data = await response.json();
-        
+
         if (response.ok) {
           // 假设返回结构为数组或包含列表的对象
           let list = [];
@@ -285,7 +285,7 @@ export default createStore({
           } else if (data && Array.isArray(data.images)) {
             list = data.images;
           }
-          
+
           return list;
         }
         return [];
@@ -339,7 +339,7 @@ export default createStore({
           } else if (data && typeof data === 'object') {
             // 直接返回 map 的情况
             map = data;
-             scenesList = Object.keys(map).map(k => ({ id: k, name: map[k] }));
+            scenesList = Object.keys(map).map(k => ({ id: k, name: map[k] }));
           }
           commit('SET_SCENE_NAME_MAP', map || {});
           commit('SET_SCENES', scenesList || []);
@@ -359,19 +359,19 @@ export default createStore({
     // 添加新场景
     async addScene({ commit }, sceneData) {
       try {
-         const response = await fetch(API_BASE + 'api/scenes', {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json'
-           },
-           body: JSON.stringify(sceneData)
-         });
-         const data = await response.json();
-         if (response.ok) {
-           return { success: true, data };
-         } else {
-           return { success: false, message: data.message || '添加场景失败' };
-         }
+        const response = await fetch(API_BASE + 'api/scenes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(sceneData)
+        });
+        const data = await response.json();
+        if (response.ok) {
+          return { success: true, data };
+        } else {
+          return { success: false, message: data.message || '添加场景失败' };
+        }
       } catch (error) {
         console.error('添加场景失败:', error);
         return { success: false, message: error.message };
@@ -383,7 +383,7 @@ export default createStore({
         const response = await fetch(`${API_BASE}api/scenes/${sceneId}`, {
           method: 'DELETE'
         });
-        
+
         // 处理 204 No Content (成功，无响应体)
         if (response.status === 204) {
           return { success: true };
@@ -394,7 +394,7 @@ export default createStore({
           // 尝试解析 JSON，如果响应体为空或非 JSON 则捕获错误
           const text = await response.text();
           if (text) {
-             data = JSON.parse(text);
+            data = JSON.parse(text);
           }
         } catch (e) {
           // 忽略解析错误，使用默认 data
@@ -415,7 +415,7 @@ export default createStore({
       if (!Array.isArray(sceneIds) || sceneIds.length === 0) {
         return { success: true, count: 0 };
       }
-      
+
       let successCount = 0;
       let failCount = 0;
       const errors = [];
@@ -448,13 +448,13 @@ export default createStore({
         if (sceneId) {
           formData.append('sceneId', sceneId);
         }
-        
+
         // 样式图上传接口
         const response = await fetch(API_BASE + 'api/style-images', {
           method: 'POST',
           body: formData
         });
-        
+
         const data = await response.json();
         if (response.ok) {
           return { success: true, data };
@@ -468,20 +468,20 @@ export default createStore({
     },
     // 获取指定场景的图片列表（不更新 store，仅返回数据）
     async fetchSceneImages({ dispatch }, sceneId) {
-       try {
+      try {
         const qs = new URLSearchParams();
         if (sceneId) qs.set('sceneId', sceneId);
         const url = `${API_BASE}api/images/filter?${qs.toString()}`;
         const response = await fetch(url);
         const data = await response.json();
         if (response.ok) {
-           return Array.isArray(data.images) ? data.images : (Array.isArray(data.list) ? data.list : []);
+          return Array.isArray(data.images) ? data.images : (Array.isArray(data.list) ? data.list : []);
         }
         return [];
-       } catch (error) {
-         console.error('获取场景图片失败', error);
-         return [];
-       }
+      } catch (error) {
+        console.error('获取场景图片失败', error);
+        return [];
+      }
     },
     // 健康检查接口
     async checkBackendHealth({ commit }) {
@@ -531,17 +531,17 @@ export default createStore({
       try {
         commit('SET_BACKEND_STATUS', 'unknown');
         commit('SET_BACKEND_ERROR', null);
-        
+
         // 先进行健康检查
         const isHealthy = await dispatch('checkBackendHealth');
         if (!isHealthy) {
           commit('SET_INSPECTION_RECORDS', []);
           return [];
         }
-        
+
         const response = await fetch(API_BASE + 'api/images');
         const data = await response.json();
-        
+
         if (response.ok) {
           const list = data.images || [];
           commit('SET_INSPECTION_RECORDS', list);
@@ -580,7 +580,7 @@ export default createStore({
         if (status && typeof status === 'string') {
           statusText = statusMap[status] || status; // 允许直接传中文
         }
-        
+
         // 如果 status 为 'all' 或 '全部'，则传空字符串给后端，后端会自动忽略 status 过滤
         if (statusText === '全部' || status === 'all') {
           statusText = '';
@@ -597,7 +597,7 @@ export default createStore({
             qs.set('status', statusText);
           }
         }
-        
+
         if (start) qs.set('start', start);
         if (end) qs.set('end', end);
         if (sceneId) qs.set('sceneId', sceneId);
@@ -653,7 +653,7 @@ export default createStore({
             body: JSON.stringify(body)
           });
           let data = {};
-          try { data = await resp.json(); } catch (_) {}
+          try { data = await resp.json(); } catch (_) { }
           const jobId = (data && (data.jobId || data.id || (data.job && (data.job.id || data.job.jobId)))) || null;
           return { id, ok: resp.ok, jobId };
         } catch (error) {
@@ -675,11 +675,11 @@ export default createStore({
             Message: '等待任务开始'
           });
         }
-      } catch (_) {}
+      } catch (_) { }
     },
     async subscribeJobs({ commit, dispatch }, jobPairs = []) {
       // jobPairs: [{ id: imageId, jobId, ok }]
-      const terminal = new Set(['completed','failed','canceled']);
+      const terminal = new Set(['completed', 'failed', 'canceled']);
       for (const pair of (jobPairs || [])) {
         if (!pair || !pair.ok || !pair.jobId) continue;
         const jobId = pair.jobId;
@@ -702,9 +702,9 @@ export default createStore({
                     es.close();
                     if (pair.id) dispatch('fetchDetectionsByImage', { imageId: pair.id });
                   }
-                } catch (_) {}
+                } catch (_) { }
               };
-              es.onerror = () => { try { es.close(); } catch (_) {}; openStream(idx + 1); };
+              es.onerror = () => { try { es.close(); } catch (_) { }; openStream(idx + 1); };
             } catch (_) { openStream(idx + 1); }
           };
           openStream(0);
@@ -714,7 +714,7 @@ export default createStore({
       }
     },
     async pollJobUntilDone({ commit, dispatch }, { jobId, imageId }) {
-      const terminal = new Set(['completed','failed','canceled']);
+      const terminal = new Set(['completed', 'failed', 'canceled']);
       const interval = 1200;
       let timer = null;
       const run = async () => {
@@ -779,12 +779,12 @@ export default createStore({
           if (Array.isArray(list)) {
             commit('SET_DETECTION_RESULTS', list);
             commit('SET_SHOW_RESULTS_PANEL', true);
-            
+
             // 优化合格/异常判定逻辑：
             // 1. 找到最新的一次检测时间（根据 updatedAt/timestamp 等字段）
             // 2. 检查该时间点的所有检测结果中是否存在异常（hasIssue）
             // 3. 如果最新一次检测结果均无异常（例如全是 Bolts），则标记为合格（hasIssue = false）
-            
+
             // 辅助函数：提取时间戳数值
             const getTimeVal = (item) => {
               const t = item.updatedAt || item.timestamp || item.time || item.CreatedAt || item.UpdatedAt || item.created_at || item.updated_at || item._fallbackTime;
@@ -805,7 +805,7 @@ export default createStore({
             if (maxTime > 0) {
               // 筛选出属于最新这一批的检测结果（允许 1秒内的误差，防止微小时间差）
               const latestItems = list.filter(item => Math.abs(getTimeVal(item) - maxTime) < 1000);
-              
+
               if (latestItems.length > 0) {
                 // 重新判断这些项是否有异常
                 // 异常判定规则：类型包含 'hole' 或 confidence >= 0.8 (且不是 bolts) 等
