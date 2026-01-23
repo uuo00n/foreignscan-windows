@@ -27,48 +27,83 @@
     
     <t-loading :loading="loading">
       <div class="scene-grid" v-if="scenes.length > 0">
-        <t-card 
-          v-for="scene in scenes" 
-          :key="scene.id" 
-          class="scene-card" 
-          :class="{ 'is-selected': selectedSceneIds.includes(scene.id), 'is-selection-mode': isSelectionMode }"
-          hover-shadow
-          @click="handleCardClick(scene)"
-        >
-          <template #cover>
-            <div class="card-cover">
-              <!-- Selection Overlay: Only visible in selection mode -->
-              <div v-if="isSelectionMode" class="selection-overlay">
-                 <CheckCircleFilledIcon v-if="selectedSceneIds.includes(scene.id)" class="check-icon checked" />
-                 <CircleIcon v-else class="check-icon unchecked" />
-              </div>
-
-              <img v-if="sceneCovers[scene.id]" :src="sceneCovers[scene.id]" alt="cover" class="cover-img" />
-              <div v-else class="cover-placeholder">
-                <ImageIcon size="32" />
-                <span>暂无图片</span>
-              </div>
-            </div>
-          </template>
-          <div class="scene-info">
-            <div class="scene-text">
-              <h3>{{ scene.name }}</h3>
-              <p class="scene-id">ID: {{ scene.id }}</p>
-            </div>
-            <div class="scene-actions" v-if="!isSelectionMode">
-              <t-dropdown 
-                :options="getDropdownOptions(scene)" 
-                :min-column-width="160"
-                :popup-props="{ overlayStyle: { width: '180px' } }"
-                @click="(data) => handleAction(data, scene)"
+        <template v-for="scene in scenes" :key="scene.id">
+          <t-image-viewer v-if="sceneCovers[scene.id] && !isSelectionMode" :images="[sceneCovers[scene.id]]">
+            <template #trigger="{ open }">
+              <t-card
+                class="scene-card"
+                :class="{ 'is-selected': selectedSceneIds.includes(scene.id), 'is-selection-mode': isSelectionMode }"
+                hover-shadow
+                @click="open"
               >
-                <t-button variant="text" shape="circle" @click.stop>
-                  <template #icon><MoreIcon /></template>
-                </t-button>
-              </t-dropdown>
+                <template #cover>
+                  <div class="card-cover">
+                    <img :src="sceneCovers[scene.id]" alt="cover" class="cover-img" />
+                  </div>
+                </template>
+                <div class="scene-info">
+                  <div class="scene-text">
+                    <h3>{{ scene.name }}</h3>
+                    <p class="scene-id">ID: {{ scene.id }}</p>
+                  </div>
+                  <div class="scene-actions">
+                    <t-dropdown
+                      :options="getDropdownOptions(scene)"
+                      :min-column-width="160"
+                      :popup-props="{ overlayStyle: { width: '180px' } }"
+                      @click="(data) => handleAction(data, scene)"
+                    >
+                      <t-button variant="text" shape="circle" @click.stop>
+                        <template #icon><MoreIcon /></template>
+                      </t-button>
+                    </t-dropdown>
+                  </div>
+                </div>
+              </t-card>
+            </template>
+          </t-image-viewer>
+
+          <t-card
+            v-else
+            class="scene-card"
+            :class="{ 'is-selected': selectedSceneIds.includes(scene.id), 'is-selection-mode': isSelectionMode }"
+            hover-shadow
+            @click="handleCardClick(scene)"
+          >
+            <template #cover>
+              <div class="card-cover">
+                <div v-if="isSelectionMode" class="selection-overlay">
+                  <CheckCircleFilledIcon v-if="selectedSceneIds.includes(scene.id)" class="check-icon checked" />
+                  <CircleIcon v-else class="check-icon unchecked" />
+                </div>
+
+                <img v-if="sceneCovers[scene.id]" :src="sceneCovers[scene.id]" alt="cover" class="cover-img" />
+                <div v-else class="cover-placeholder">
+                  <ImageIcon size="32" />
+                  <span>暂无图片</span>
+                </div>
+              </div>
+            </template>
+            <div class="scene-info">
+              <div class="scene-text">
+                <h3>{{ scene.name }}</h3>
+                <p class="scene-id">ID: {{ scene.id }}</p>
+              </div>
+              <div class="scene-actions" v-if="!isSelectionMode">
+                <t-dropdown
+                  :options="getDropdownOptions(scene)"
+                  :min-column-width="160"
+                  :popup-props="{ overlayStyle: { width: '180px' } }"
+                  @click="(data) => handleAction(data, scene)"
+                >
+                  <t-button variant="text" shape="circle" @click.stop>
+                    <template #icon><MoreIcon /></template>
+                  </t-button>
+                </t-dropdown>
+              </div>
             </div>
-          </div>
-        </t-card>
+          </t-card>
+        </template>
       </div>
       <div v-else class="empty-state">
            <t-empty description="暂无场景数据" />
@@ -105,13 +140,6 @@
       </t-form>
     </t-dialog>
 
-    <!-- Image Preview: 仅在需要时渲染，避免页面底部出现占位 -->
-    <t-image-viewer
-      v-if="previewVisible"
-      v-model:visible="previewVisible"
-      :images="[previewImage]"
-      @close="previewVisible = false"
-    />
   </div>
 </template>
 
@@ -152,9 +180,6 @@ export default {
     // 当前正在上传图片的场景ID
     const uploadSceneId = ref(null);
 
-    // 图片预览状态
-    const previewVisible = ref(false);
-    const previewImage = ref('');
 
     const scenes = computed(() => store.getters.scenes || []);
     
@@ -329,12 +354,6 @@ export default {
     const handleCardClick = (scene) => {
       if (isSelectionMode.value) {
         toggleSelectScene(scene.id);
-      } else {
-        const url = sceneCovers[scene.id];
-        if (url) {
-          previewImage.value = url;
-          previewVisible.value = true;
-        }
       }
     };
     
@@ -455,8 +474,6 @@ export default {
       handleAction,
       getDropdownOptions,
       handleCardClick,
-      previewVisible,
-      previewImage
     };
   }
 };

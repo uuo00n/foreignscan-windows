@@ -206,6 +206,18 @@ export default createStore({
       delete next[jobId];
       state.detectJobs = next;
     },
+    CLEAR_DETECT_JOBS_HISTORY(state) {
+      const jobs = state.detectJobs || {};
+      const terminal = new Set(['completed', 'failed', 'canceled']);
+      const next = {};
+      for (const [id, job] of Object.entries(jobs)) {
+        if (!job) continue;
+        if (!terminal.has(job.Status)) {
+          next[id] = job;
+        }
+      }
+      state.detectJobs = next;
+    },
     UPDATE_RECORD_STATUS(state, { id, status }) {
       if (!id || !status) return;
       const list = Array.isArray(state.inspectionRecords) ? state.inspectionRecords : [];
@@ -855,6 +867,10 @@ export default createStore({
       } catch (e) {
         return false;
       }
+    },
+    clearDetectJobsHistory({ commit }) {
+      commit('CLEAR_DETECT_JOBS_HISTORY');
+      return true;
     },
     setListActiveTab({ commit }, tab) {
       commit('SET_LIST_ACTIVE_TAB', tab);

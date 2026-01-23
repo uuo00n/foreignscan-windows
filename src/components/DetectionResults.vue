@@ -7,15 +7,13 @@
         </t-tag>
       </template>
       
-      <!-- 对比图容器 -->
-      <div v-if="processedImagePath" class="image-container" @click="openImagePreview">
-        <img :src="processedImagePath" alt="识别对比图" class="processed-image" />
-      </div>
-      
-      <!-- 图片预览组件 (隐藏触发元素，仅使用弹窗功能) -->
-      <div style="display: none;">
-        <t-image-viewer v-model:visible="showImagePreview" :images="[processedImagePath]" />
-      </div>
+      <t-image-viewer v-if="processedImagePath" :images="[processedImagePath]">
+        <template #trigger="{ open }">
+          <div class="image-container" @click="open">
+            <img :src="processedImagePath" alt="识别对比图" class="processed-image" />
+          </div>
+        </template>
+      </t-image-viewer>
 
       <!-- 结果列表 -->
       <div v-if="groupedResults.length > 0" class="results-content">
@@ -88,11 +86,6 @@ export default {
     InfoCircleIcon,
     CheckCircleIcon
   },
-  data() {
-    return {
-      showImagePreview: false
-    };
-  },
   computed: {
     ...mapState(['detectionResults', 'processedImagePath']),
     // 根据时间戳对检测结果进行分组
@@ -134,11 +127,6 @@ export default {
     }
   },
   methods: {
-    openImagePreview() {
-      if (this.processedImagePath) {
-        this.showImagePreview = true;
-      }
-    },
     // 获取检测结果状态：qualified(合格) | review(需复检) | risk(异常/高风险)
     getResultStatus(result) {
       if (!result || !result.type) return 'risk';

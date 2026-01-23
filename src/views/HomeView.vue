@@ -85,7 +85,7 @@
       >
         <div class="jobs-dialog">
           <template v-if="Object.keys(detectJobs || {}).length === 0">
-            <t-empty description="暂无正在进行的任务" />
+            <t-empty description="暂无任务" />
           </template>
         <template v-else>
           <div class="job-item" v-for="job in Object.values(detectJobs)" :key="job.ID">
@@ -114,6 +114,7 @@
         </div>
         <template #footer>
           <t-space>
+            <t-button theme="danger" variant="outline" :disabled="!hasDetectJobHistory" @click="clearJobsHistory">清空历史进度</t-button>
             <t-button variant="outline" @click="jobsDialogVisible=false">关闭</t-button>
           </t-space>
         </template>
@@ -154,7 +155,7 @@ import DetectionResults from '@/components/DetectionResults.vue';
 import SideMenu from '@/components/SideMenu.vue';
 import ScenePreview from '@/components/ScenePreview.vue';
 import { mapState } from 'vuex';
-import { MessagePlugin } from 'tdesign-vue-next';
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next';
 // 引入 TDesign 图标库中的日历图标
 import { CalendarIcon, RefreshIcon, ViewListIcon } from 'tdesign-icons-vue-next';
 
@@ -180,6 +181,10 @@ export default {
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
     ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords', 'listActiveTab', 'isBatchMode']),
+    hasDetectJobHistory() {
+      const terminal = new Set(['completed', 'failed', 'canceled']);
+      return Object.values(this.detectJobs || {}).some((job) => job && terminal.has(job.Status));
+    },
     counts() {
       const list = Array.isArray(this.inspectionRecords) ? this.inspectionRecords : [];
       const statusKey = (s) => {
@@ -343,6 +348,18 @@ export default {
     },
     openJobsDialog() {
       this.jobsDialogVisible = true;
+    },
+    clearJobsHistory() {
+      const confirmDialog = DialogPlugin.confirm({
+        header: '清空历史进度',
+        body: '将清空已完成/失败/取消的任务记录，进行中的任务不会受影响。确认继续？',
+        theme: 'warning',
+        onConfirm: async () => {
+          confirmDialog.hide();
+          await this.$store.dispatch('clearDetectJobsHistory');
+          MessagePlugin.success('已清空历史进度');
+        }
+      });
     }
   },
   // 移除所有本地模拟数据加载，数据将由组件挂载时通过网络获取
