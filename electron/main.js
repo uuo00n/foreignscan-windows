@@ -1,6 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const fetch = require('node-fetch');
 const isDevelopment = process.env.NODE_ENV !== 'production';
 // 统一后端地址配置：从前端配置文件读取
@@ -15,20 +14,21 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true
+      contextIsolation: false
     }
   });
+
+  const shouldOpenDevTools = process.env.ELECTRON_OPEN_DEVTOOLS === 'true';
 
   // 加载应用
   if (isDevelopment) {
     // 开发环境下，加载本地开发服务器
-    mainWindow.loadURL('http://localhost:8080');
+    mainWindow.loadURL('http://127.0.0.1:8080');
     // 通过环境变量控制是否打开开发者工具，默认不打开
     // 使用方式：在启动命令前设置 ELECTRON_OPEN_DEVTOOLS=true 才会打开
     // 例如：ELECTRON_OPEN_DEVTOOLS=true npm run electron:serve
-    const shouldOpenDevTools = process.env.ELECTRON_OPEN_DEVTOOLS === 'true';
     if (shouldOpenDevTools) {
       mainWindow.webContents.openDevTools();
     }
@@ -36,11 +36,18 @@ function createWindow() {
     // 生产环境下，加载打包后的index.html
     mainWindow.loadURL(`file://${path.join(__dirname, '../dist/index.html')}`);
     // 同样支持通过环境变量在生产环境下打开开发者工具（默认不打开）
-    const shouldOpenDevTools = process.env.ELECTRON_OPEN_DEVTOOLS === 'true';
     if (shouldOpenDevTools) {
       mainWindow.webContents.openDevTools();
     }
   }
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return;
+    console.error(`[startup] 页面加载失败: code=${errorCode}, reason=${errorDescription}, url=${validatedURL}`);
+    if (isDevelopment) {
+      console.error('[startup] 请确认渲染进程已启动: npm run dev:renderer');
+    }
+  });
 
   // 当窗口关闭时触发
   mainWindow.on('closed', () => {
@@ -86,8 +93,7 @@ ipcMain.handle('check-health', async () => {
   }
 });
 
-// 获取图片列表
-ipcMain.handle('get-images', async () => {
+async function handleGetImages() {
   try {
     const response = await fetch(API_BASE + 'api/images');
     if (response.ok) {
@@ -99,10 +105,25 @@ ipcMain.handle('get-images', async () => {
     console.error('获取图片列表失败:', error);
     return [];
   }
-});
+}
+
+// 获取图片列表
+ipcMain.handle('get-images', handleGetImages);
+// 兼容旧通道命名
+ipcMain.handle('get-image-list', handleGetImages);
 
 // 图片检测
-ipcMain.handle('run-detection', async (event, { imageId }) => {
+ipcMain.handle('run-detection', async (event, payload) => {
+  const imageId =
+    typeof payload === 'string' || typeof payload === 'number'
+      ? String(payload)
+      : payload && payload.imageId;
+
+  if (!imageId) {
+    console.warn('run-detection 缺少 imageId');
+    return [];
+  }
+
   try {
     const response = await fetch(API_BASE + `api/images/${imageId}/detections`);
 

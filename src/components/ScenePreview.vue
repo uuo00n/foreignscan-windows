@@ -148,9 +148,7 @@ import { computed, ref, onMounted, reactive, h } from 'vue';
 import { useStore } from 'vuex';
 import { AddIcon, UploadIcon, ImageIcon, DeleteIcon, CheckCircleFilledIcon, CircleIcon, MoreIcon } from 'tdesign-icons-vue-next';
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next';
-import apiConfig from '../config/api.json';
-
-const API_BASE = apiConfig.API_BASE;
+import { apiBaseUrl } from '../services/apiClient';
 
 export default {
   name: 'ScenePreview',
@@ -218,7 +216,7 @@ export default {
       }
       
       // 处理 API_BASE 结尾的 /
-      let base = API_BASE;
+      let base = apiBaseUrl;
       if (base.endsWith('/')) {
         base = base.slice(0, -1);
       }

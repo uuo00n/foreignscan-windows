@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "description": "前端界面，连接Go后端服务",
   "main": "electron/main.js",
+  "engines": {
+    "node": ">=22.22.1 <23"
+  },
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "test": "vitest",
-    "electron:serve": "cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron .",
-    "electron:build": "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder"
+    "dev:renderer": "vue-cli-service serve --host 127.0.0.1 --port 8080",
+    "dev:electron": "wait-on tcp:127.0.0.1:8080 && cross-env NODE_ENV=development electron .",
+    "electron:serve": "concurrently -k -n renderer,electron -c cyan,green \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "electron:build": "npm run build && electron-builder"
   },
   "dependencies": {
     "axios": "^1.6.2",
@@ -25,14 +30,16 @@
     "@vitejs/plugin-vue": "^5.2.4",
     "@vue/cli-service": "^5.0.9",
     "@vue/test-utils": "^2.4.6",
+    "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
-    "electron": "^16.2.8",
-    "electron-builder": "^23.0.0",
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3",
     "html-webpack-plugin": "^5.6.4",
     "jsdom": "^26.1.0",
     "sass": "^1.56.0",
     "sass-loader": "^13.2.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^8.0.1"
   },
   "keywords": [],
   "author": "",

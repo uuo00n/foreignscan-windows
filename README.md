@@ -2,7 +2,7 @@
 
 ![Private](https://img.shields.io/badge/Repository-Private-red)
 ![Vue](https://img.shields.io/badge/Vue.js-3.x-4FC08D?style=flat&logo=vue.js)
-![Electron](https://img.shields.io/badge/Electron-16.x-47848F?style=flat&logo=electron)
+![Electron](https://img.shields.io/badge/Electron-30.x-47848F?style=flat&logo=electron)
 ![Platform](https://img.shields.io/badge/Platform-Win%20|%20Mac%20|%20Linux-lightgrey)
 ![Copyright](https://img.shields.io/badge/Copyright-2026_uuo00n-blue)
 
@@ -33,8 +33,8 @@
 
 ### 前置要求
 
-- **Node.js**: 推荐 v18+
-- **Go 后端**: 后端服务必须正在运行 (默认 `http://localhost:3000`)
+- **Node.js**: `22.22.1`（见 `.nvmrc`，建议使用 nvm 固定版本）
+- **Go 后端**: 本地接口服务可用（端口按你的后端配置）
 
 ### 1. 安装依赖
 
@@ -42,25 +42,63 @@
 npm install
 ```
 
-### 2. 开发模式运行
+### 2. 配置后端地址（必须）
+
+后端地址配置位于 `src/config/api.json`。请先改为你的后端实际地址，再启动前端。
+
+示例（当前常用联调端口 `3000`）：
+
+```json
+{
+  "API_BASE": "http://127.0.0.1:3000/"
+}
+```
+
+### 3. 启动后端服务
+
+确认后端接口服务已启动并可访问（例如健康检查接口 `/ping` 可返回）。
+
+### 4. 开发模式运行
 
 ```bash
 npm run electron:serve
 ```
 
-### 3. 生产环境构建
+该命令会并行启动：
+- `dev:renderer`（Vue 开发服务器，`127.0.0.1:8080`）
+- `dev:electron`（等待 8080 就绪后再启动 Electron）
+
+### 5. 生产环境构建
 
 ```bash
 npm run electron:build
 ```
 
+### 6. 常用调试命令
+
+```bash
+# 仅启动前端开发服务器
+npm run dev:renderer
+
+# 仅启动 Electron（要求 8080 已可访问）
+npm run dev:electron
+
+# 单元测试
+npm run test
+```
+
+### 7. 开发启动模式说明
+
+- 一键启动：`npm run electron:serve`（推荐，自动编排 renderer + electron）
+- 分离启动：先 `npm run dev:renderer`，再 `npm run dev:electron`
+
 ## 配置说明
 
-后端地址配置位于 `src/config/api.json`。如需修改后端地址，请编辑此文件：
+后端地址配置位于 `src/config/api.json`。该值必须与后端服务实际监听地址一致。
 
 ```json
 {
-  "API_BASE": "http://localhost:3000/"
+  "API_BASE": "http://127.0.0.1:3000/"
 }
 ```
 
@@ -78,6 +116,19 @@ foreignscan-windows/
 ├── public/              # 静态资源
 └── package.json         # 项目依赖
 ```
+
+## 常见问题排查
+
+- `Electron exited with signal SIGABRT`
+  - 先确认 Node 版本是否为 `22.22.1`。
+  - 执行 `npm install` 重新安装依赖，确保使用 Electron 30.x。
+- 窗口白屏或加载失败
+  - 确认 `127.0.0.1:8080` 可访问（`dev:renderer` 已启动）。
+  - 终端会输出 `[startup] 页面加载失败` 日志，可据此定位端口/服务问题。
+- 接口请求失败
+  - 检查 `src/config/api.json` 中 `API_BASE` 是否和后端实际端口一致（例如 `3000`）。
+  - 当前前端开发服务固定使用 `8080`，不要与后端端口混用。
+  - 确认后端健康检查可通过（`/ping`）。
 
 ## 版权与许可
 

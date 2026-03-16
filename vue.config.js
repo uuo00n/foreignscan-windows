@@ -21,6 +21,7 @@ module.exports = defineConfig({
   },
   // 设置开发服务器端口为8080
   devServer: {
+    host: '127.0.0.1',
     port: 8080
   },
   // 配置Node.js核心模块的polyfill

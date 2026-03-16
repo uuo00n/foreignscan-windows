@@ -50,8 +50,6 @@
 
 <script>
 import { mapState, mapActions } from 'vuex';
-import apiConfig from '../config/api.json';
-const API_BASE = apiConfig.API_BASE;
 
 // 条件导入 Electron，避免在浏览器环境中报错
 const electron = window.require ? window.require('electron') : null;

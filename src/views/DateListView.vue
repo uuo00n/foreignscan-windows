@@ -139,11 +139,9 @@
 
 <script>
 import { mapState, mapActions } from 'vuex';
-import apiConfig from '../config/api.json';
+import { getJson } from '../services/apiClient';
 // 引入 TDesign 图标：左箭头图标用于返回
 import { ChevronLeftIcon, DownloadIcon } from 'tdesign-icons-vue-next';
-
-const API_BASE = apiConfig.API_BASE;
 
 export default {
   name: 'DateListView',
@@ -153,15 +151,29 @@ export default {
     DownloadIcon
   },
   computed: {
-    ...mapState(['inspectionRecords', 'sceneNameMap']),
+    ...mapState(['inspectionRecords', 'sceneNameMap', 'currentSceneLatestInfo']),
     // 分页后的记录：只渲染当前页应显示的数据
     pagedRecords() {
       const start = (this.currentPage - 1) * this.pageSize;
       return (this.inspectionRecords || []).slice(start, start + this.pageSize);
+    },
+    sceneLatestTheme() {
+      if (!this.currentSceneLatestInfo) return 'default';
+      if (this.currentSceneLatestInfo.hasIssue === true) return 'danger';
+      if (this.currentSceneLatestInfo.latestStatus === '已检测') return 'success';
+      if (this.currentSceneLatestInfo.latestStatus === '未检测') return 'warning';
+      return 'default';
+    },
+    sceneLatestText() {
+      if (!this.currentSceneLatestInfo) return '未知';
+      if (this.currentSceneLatestInfo.hasIssue === true) return '异常';
+      if (this.currentSceneLatestInfo.latestStatus === '已检测') return '合格';
+      if (this.currentSceneLatestInfo.latestStatus === '未检测') return '未检测';
+      return this.currentSceneLatestInfo.latestStatus || '未知';
     }
   },
   methods: {
-    ...mapActions(['fetchImagesByFilter', 'fetchSceneNameMap', 'setCurrentRecord']),
+    ...mapActions(['fetchImagesByFilter', 'fetchSceneNameMap', 'setCurrentRecord', 'fetchSceneLatestInfo']),
     // 返回首页：桌面端窗口无系统返回按钮，使用路由跳转到首页
     goBack() {
       this.$router.push({ name: 'home' });
@@ -195,6 +207,7 @@ export default {
 
         // 调用后端筛选接口
         await this.fetchImagesByFilter(params);
+        await this.fetchSceneLatestInfo(this.selectedScene || null);
         // 刷新数据后重置为第一页
         this.currentPage = 1;
       } finally {
@@ -230,16 +243,13 @@ export default {
 
       try {
         this.$message.loading('正在导出报告...', 0);
-        // 使用 fetch 直接调用后端接口，避免影响当前列表视图状态
-        const url = `${API_BASE}api/images/filter?${qs.toString()}`;
-        const response = await fetch(url);
-        const data = await response.json();
+        const { ok, data } = await getJson(`/api/images/filter?${qs.toString()}`);
         
         // 关闭 loading
         this.$message.closeAll();
 
-        if (!response.ok) {
-          this.$message.error(data.message || '导出失败');
+        if (!ok) {
+          this.$message.error((data && data.message) || '导出失败');
           return;
         }
 
@@ -315,6 +325,12 @@ export default {
         this.$message.closeAll();
         this.$message.error('导出报告出错');
       }
+    },
+    viewLatestImage() {
+      const image = this.currentSceneLatestInfo && this.currentSceneLatestInfo.latestImage;
+      if (!image) return;
+      this.setCurrentRecord(image);
+      this.$router.push({ name: 'home' });
     },
     selectRecord(record) {
       // 选中记录后，便于右侧查看详情
