@@ -4,7 +4,18 @@
       <div class="toolbar">
         <div class="toolbar-left">
           <t-space :break-line="true" :size="12">
-            <t-button theme="primary" @click="openImportDialog">
+            <t-button theme="primary" :disabled="roomsTree.length === 0" @click="openCreateDialog">
+              新增点位
+            </t-button>
+            <t-button
+              :theme="multiSelectMode ? 'primary' : 'default'"
+              variant="outline"
+              :disabled="filteredPoints.length === 0"
+              @click="toggleMultiSelectMode"
+            >
+              {{ multiSelectMode ? '退出批量删除' : '批量删除' }}
+            </t-button>
+            <t-button theme="default" @click="openImportDialog">
               <template #icon><UploadIcon /></template>
               配置导入
             </t-button>
@@ -33,7 +44,7 @@
         <div class="rooms-title">房间列表</div>
         <t-menu
           v-if="roomsTree.length > 0"
-          :value="selectedRoomId"
+          :value="menuActiveRoomId"
           width="100%"
           class="rooms-menu"
           @change="handleRoomChange"
@@ -48,16 +59,47 @@
       </aside>
 
       <section class="points-panel">
-        <div class="points-header" v-if="selectedRoomId">
-          <div class="title">{{ currentRoomName }}</div>
-          <div class="meta">点位数 {{ currentRoomPoints.length }}</div>
+        <div class="points-header" v-if="roomsTree.length > 0">
+          <div class="title">{{ pointsHeaderTitle }}</div>
+          <div class="meta">显示 {{ filteredPoints.length }} / {{ basePoints.length }}</div>
+        </div>
+        <div class="points-search" v-if="roomsTree.length > 0">
+          <t-space :break-line="true" align="center" :size="12">
+            <t-input
+              v-model="searchKeyword"
+              clearable
+              class="search-input"
+              placeholder="搜索点位ID/名称/编码/位置/房间"
+            />
+            <t-radio-group v-model="searchScope" variant="default-filled">
+              <t-radio-button value="room">当前房间</t-radio-button>
+              <t-radio-button value="all">全房间</t-radio-button>
+            </t-radio-group>
+          </t-space>
+        </div>
+        <div class="bulk-actions" v-if="roomsTree.length > 0 && multiSelectMode">
+          <t-space :break-line="true" align="center" :size="10">
+            <span class="bulk-selected">已选 {{ selectedCount }} 项</span>
+            <t-button size="small" variant="outline" :disabled="pagedRoomPoints.length === 0" @click="selectCurrentPage">
+              全选当前页
+            </t-button>
+            <t-button size="small" variant="outline" :disabled="filteredPoints.length === 0" @click="selectFiltered">
+              全选筛选结果
+            </t-button>
+            <t-button size="small" variant="outline" :disabled="selectedCount === 0" @click="clearSelection">
+              清空选择
+            </t-button>
+            <t-button size="small" theme="danger" :disabled="selectedCount === 0" @click="openBulkDeleteDialog">
+              批量删除（选中{{ selectedCount }}）
+            </t-button>
+          </t-space>
         </div>
 
         <t-loading :loading="loading">
           <div class="points-content">
-            <template v-if="currentRoomPoints.length > 0">
+            <template v-if="filteredPoints.length > 0">
               <template v-if="viewMode === 'grid'">
-                <div class="scene-grid">
+                <div class="scene-grid" ref="gridScrollRef">
                   <t-card class="scene-card" hover-shadow v-for="point in pagedRoomPoints" :key="point.id">
                 <template #cover>
                   <t-image-viewer v-if="sceneCovers[point.id]" :images="[sceneCovers[point.id]]">
@@ -76,9 +118,16 @@
                 </template>
 
                   <div class="scene-info">
+                    <div class="scene-select" v-if="multiSelectMode">
+                      <t-checkbox
+                        :checked="isPointSelected(point.id)"
+                        @change="(checked) => togglePointSelection(point.id, checked)"
+                      />
+                    </div>
                     <div class="scene-text">
                       <h3>{{ point.name || point.id }}</h3>
                       <p class="scene-id">点位ID: {{ point.id }}</p>
+                      <p class="scene-room" v-if="searchScope === 'all'">房间: {{ point.roomName || point.roomId }}</p>
                     </div>
                     <div class="scene-actions">
                       <t-button size="small" variant="outline" @click="triggerUpload(point)">
@@ -90,7 +139,7 @@
               </div>
               <div class="points-pagination" v-if="showGridPagination">
                 <t-pagination
-                  :total="currentRoomPoints.length"
+                  :total="filteredPoints.length"
                   v-model:current="gridCurrentPage"
                   v-model:pageSize="gridPageSize"
                   :pageSizeOptions="[24, 48, 96]"
@@ -103,11 +152,18 @@
 
               <t-list
                 v-else
+                ref="listScrollRef"
                 class="point-list"
                 split
               >
-                <t-list-item v-for="point in currentRoomPoints" :key="point.id">
+                <t-list-item v-for="point in filteredPoints" :key="point.id">
                   <div class="point-row">
+                    <div class="point-select" v-if="multiSelectMode">
+                      <t-checkbox
+                        :checked="isPointSelected(point.id)"
+                        @change="(checked) => togglePointSelection(point.id, checked)"
+                      />
+                    </div>
                     <div class="point-thumb">
                       <t-image-viewer v-if="sceneCovers[point.id]" :images="[sceneCovers[point.id]]">
                         <template #trigger="{ open }">
@@ -127,6 +183,7 @@
                     <div class="point-main">
                       <div class="point-title">{{ point.name || point.id }}</div>
                       <div class="point-id">点位ID: {{ point.id }}</div>
+                      <div class="point-room" v-if="searchScope === 'all'">房间: {{ point.roomName || point.roomId }}</div>
                     </div>
 
                     <div class="point-actions">
@@ -140,10 +197,21 @@
             </template>
 
             <div v-else class="empty-state">
-              <t-empty :description="roomsTree.length > 0 ? '当前房间暂无点位数据' : '暂无点位数据'" />
+              <t-empty :description="emptyDescription" />
             </div>
           </div>
         </t-loading>
+        <t-button
+          v-if="showBackToTop"
+          class="back-top-btn"
+          shape="circle"
+          size="large"
+          theme="primary"
+          :style="backTopStyle"
+          @click="scrollToTop"
+        >
+          <template #icon><BacktopIcon /></template>
+        </t-button>
       </section>
     </div>
 
@@ -154,6 +222,51 @@
       accept="image/*"
       @change="handleFileChange"
     />
+
+    <t-dialog
+      v-model:visible="createDialogVisible"
+      header="新增点位"
+      width="560px"
+      :close-on-overlay-click="false"
+      :close-btn="!creating"
+    >
+      <div class="create-point-body">
+        <t-select v-model="createForm.roomId" placeholder="请选择所属房间">
+          <t-option v-for="room in roomsTree" :key="room.id" :label="room.name || room.id" :value="String(room.id)" />
+        </t-select>
+        <t-input v-model="createForm.name" placeholder="点位名称（必填）" />
+        <t-input v-model="createForm.code" placeholder="点位编码（可选）" />
+        <t-input v-model="createForm.location" placeholder="点位位置（可选）" />
+      </div>
+      <template #footer>
+        <t-space>
+          <t-button variant="outline" :disabled="creating" @click="closeCreateDialog">取消</t-button>
+          <t-button theme="primary" :loading="creating" @click="executeCreatePoint">确认新增</t-button>
+        </t-space>
+      </template>
+    </t-dialog>
+
+    <t-dialog
+      v-model:visible="bulkDeleteDialogVisible"
+      header="批量删除点位"
+      width="520px"
+      :close-on-overlay-click="false"
+      :close-btn="!deleting"
+    >
+      <div class="confirm-body">
+        <p>确认删除已选中的 <b>{{ selectedCount }}</b> 个点位吗？</p>
+        <p>仅无关联样式图/图片/检测记录的点位允许删除。</p>
+        <p>删除将逐条执行，失败项会在完成后统一汇总提示。</p>
+      </div>
+      <template #footer>
+        <t-space>
+          <t-button variant="outline" :disabled="deleting" @click="closeBulkDeleteDialog">取消</t-button>
+          <t-button theme="danger" :loading="deleting" :disabled="selectedCount === 0" @click="executeBulkDelete">
+            确认批量删除
+          </t-button>
+        </t-space>
+      </template>
+    </t-dialog>
 
     <t-dialog
       v-model:visible="importDialogVisible"
@@ -238,9 +351,9 @@
 </template>
 
 <script>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import { UploadIcon, ImageIcon, DownloadIcon, RefreshIcon } from 'tdesign-icons-vue-next';
+import { UploadIcon, ImageIcon, DownloadIcon, RefreshIcon, BacktopIcon } from 'tdesign-icons-vue-next';
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next';
 import { apiBaseUrl } from '../services/apiClient';
 
@@ -309,7 +422,8 @@ export default {
     UploadIcon,
     ImageIcon,
     DownloadIcon,
-    RefreshIcon
+    RefreshIcon,
+    BacktopIcon
   },
   setup() {
     const store = useStore();
@@ -323,17 +437,38 @@ export default {
     const importFileName = ref('');
     const importPayload = ref(null);
     const importSummary = reactive({ roomCount: 0, pointCount: 0 });
+    const creating = ref(false);
+    const deleting = ref(false);
+    const createDialogVisible = ref(false);
+    const bulkDeleteDialogVisible = ref(false);
+    const multiSelectMode = ref(false);
+    const selectedPointIds = ref([]);
+    const createForm = reactive({
+      roomId: '',
+      name: '',
+      code: '',
+      location: ''
+    });
 
     const sceneCovers = reactive({});
     const fileInputRef = ref(null);
+    const gridScrollRef = ref(null);
+    const listScrollRef = ref(null);
+    const showBackToTop = ref(false);
     const uploadPointId = ref(null);
     const selectedRoomId = ref('');
     const viewMode = ref('grid');
     const gridCurrentPage = ref(1);
     const gridPageSize = ref(24);
+    const searchKeyword = ref('');
+    const searchScope = ref('room');
 
     const scenes = computed(() => store.getters.scenes || []);
     const roomsTree = computed(() => store.getters.roomsTree || []);
+    const firstRoomId = computed(() => {
+      const room = Array.isArray(roomsTree.value) ? roomsTree.value[0] : null;
+      return room ? String(room.id || '') : '';
+    });
 
     const currentRoomPoints = computed(() => {
       if (!selectedRoomId.value) return [];
@@ -344,12 +479,52 @@ export default {
       const room = roomsTree.value.find((item) => String(item.id || '') === String(selectedRoomId.value));
       return room ? (room.name || room.id) : '未选择房间';
     });
+    const menuActiveRoomId = computed(() => {
+      return searchScope.value === 'all' ? '' : selectedRoomId.value;
+    });
+    const basePoints = computed(() => {
+      if (searchScope.value === 'all') return scenes.value;
+      return currentRoomPoints.value;
+    });
+    const filteredPoints = computed(() => {
+      const keyword = String(searchKeyword.value || '').trim().toLowerCase();
+      if (!keyword) return basePoints.value;
+      return basePoints.value.filter((point) => {
+        const fields = [
+          point.id,
+          point.name,
+          point.code,
+          point.location,
+          point.roomName
+        ];
+        return fields.some((field) => String(field || '').toLowerCase().includes(keyword));
+      });
+    });
+    const pointsHeaderTitle = computed(() => {
+      return searchScope.value === 'all' ? '全房间点位列表' : currentRoomName.value;
+    });
+    const emptyDescription = computed(() => {
+      const keyword = String(searchKeyword.value || '').trim();
+      if (keyword) return '未找到匹配点位';
+      if (roomsTree.value.length === 0) return '暂无点位数据';
+      return searchScope.value === 'all' ? '暂无点位数据' : '当前房间暂无点位数据';
+    });
     const pagedRoomPoints = computed(() => {
       const start = (gridCurrentPage.value - 1) * gridPageSize.value;
-      return currentRoomPoints.value.slice(start, start + gridPageSize.value);
+      return filteredPoints.value.slice(start, start + gridPageSize.value);
     });
     const showGridPagination = computed(() => {
-      return viewMode.value === 'grid' && currentRoomPoints.value.length > gridPageSize.value;
+      return viewMode.value === 'grid' && filteredPoints.value.length > gridPageSize.value;
+    });
+    const backTopStyle = computed(() => ({
+      bottom: showGridPagination.value ? '76px' : '18px'
+    }));
+    const selectedCount = computed(() => selectedPointIds.value.length);
+    const selectedPointIdSet = computed(() => new Set(selectedPointIds.value));
+    const selectedPoints = computed(() => {
+      if (selectedPointIds.value.length === 0) return [];
+      const map = new Map(filteredPoints.value.map((point) => [String(point.id), point]));
+      return selectedPointIds.value.map((id) => map.get(String(id))).filter(Boolean);
     });
 
     const hasImportPayload = computed(() => {
@@ -421,23 +596,95 @@ export default {
           }
         }
         gridCurrentPage.value = 1;
+        await nextTick();
+        updateBackToTopVisible();
       } finally {
         loading.value = false;
       }
     };
 
-    onMounted(() => {
-      fetchScenes();
+    let removeActiveScrollListener = null;
+    const unbindActiveScrollListener = () => {
+      if (typeof removeActiveScrollListener === 'function') {
+        removeActiveScrollListener();
+      }
+      removeActiveScrollListener = null;
+    };
+    const resolveScrollEl = (candidate) => {
+      if (!candidate) return null;
+      if (typeof HTMLElement !== 'undefined' && candidate instanceof HTMLElement) return candidate;
+      if (candidate.$el && (typeof HTMLElement === 'undefined' || candidate.$el instanceof HTMLElement)) {
+        return candidate.$el;
+      }
+      return null;
+    };
+    const getActiveScrollEl = () => {
+      if (viewMode.value === 'grid') return resolveScrollEl(gridScrollRef.value);
+      return resolveScrollEl(listScrollRef.value);
+    };
+    const updateBackToTopVisible = () => {
+      const el = getActiveScrollEl();
+      showBackToTop.value = !!(el && el.scrollTop > 240);
+    };
+    const bindActiveScrollListener = () => {
+      unbindActiveScrollListener();
+      const el = getActiveScrollEl();
+      if (!el) {
+        showBackToTop.value = false;
+        return;
+      }
+
+      const onScroll = () => {
+        showBackToTop.value = el.scrollTop > 240;
+      };
+      el.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+      removeActiveScrollListener = () => {
+        el.removeEventListener('scroll', onScroll);
+      };
+    };
+    const scrollToTop = () => {
+      const el = getActiveScrollEl();
+      if (!el) return;
+      el.scrollTo({ top: 0, behavior: 'smooth' });
+      showBackToTop.value = false;
+    };
+
+    onMounted(async () => {
+      await fetchScenes();
+      await nextTick();
+      bindActiveScrollListener();
+    });
+    onBeforeUnmount(() => {
+      unbindActiveScrollListener();
     });
     const resetGridPage = () => {
       gridCurrentPage.value = 1;
     };
     const ensureGridPageInRange = () => {
-      const maxPage = Math.max(1, Math.ceil(currentRoomPoints.value.length / gridPageSize.value));
+      const maxPage = Math.max(1, Math.ceil(filteredPoints.value.length / gridPageSize.value));
       if (gridCurrentPage.value > maxPage) gridCurrentPage.value = 1;
     };
 
+    watch([searchKeyword, searchScope], () => {
+      resetGridPage();
+    });
+    watch(filteredPoints, (points) => {
+      const visibleSet = new Set(points.map((item) => String(item.id)));
+      selectedPointIds.value = selectedPointIds.value.filter((id) => visibleSet.has(String(id)));
+      nextTick(() => {
+        bindActiveScrollListener();
+      });
+    });
+    watch(viewMode, async () => {
+      await nextTick();
+      bindActiveScrollListener();
+    });
+
     const handleRoomChange = (value) => {
+      if (searchScope.value === 'all') {
+        searchScope.value = 'room';
+      }
       selectedRoomId.value = String(value || '');
       resetGridPage();
     };
@@ -450,6 +697,48 @@ export default {
       }
       if (typeof current === 'number') {
         gridCurrentPage.value = current;
+      }
+    };
+
+    const isPointSelected = (pointId) => selectedPointIdSet.value.has(String(pointId));
+
+    const togglePointSelection = (pointId, checked) => {
+      const id = String(pointId || '');
+      if (!id) return;
+      const set = new Set(selectedPointIds.value.map((item) => String(item)));
+      let nextChecked = !set.has(id);
+      if (typeof checked === 'boolean') {
+        nextChecked = checked;
+      } else if (checked && typeof checked.checked === 'boolean') {
+        nextChecked = checked.checked;
+      }
+      if (nextChecked) {
+        set.add(id);
+      } else {
+        set.delete(id);
+      }
+      selectedPointIds.value = Array.from(set);
+    };
+
+    const clearSelection = () => {
+      selectedPointIds.value = [];
+    };
+
+    const selectCurrentPage = () => {
+      const set = new Set(selectedPointIds.value.map((item) => String(item)));
+      pagedRoomPoints.value.forEach((point) => set.add(String(point.id)));
+      selectedPointIds.value = Array.from(set);
+    };
+
+    const selectFiltered = () => {
+      selectedPointIds.value = filteredPoints.value.map((point) => String(point.id));
+    };
+
+    const toggleMultiSelectMode = () => {
+      multiSelectMode.value = !multiSelectMode.value;
+      if (!multiSelectMode.value) {
+        clearSelection();
+        bulkDeleteDialogVisible.value = false;
       }
     };
 
@@ -483,6 +772,116 @@ export default {
       }
 
       uploadPointId.value = null;
+    };
+
+    const resetCreateForm = () => {
+      const currentRoom = String(selectedRoomId.value || '');
+      if (!currentRoom) {
+        createForm.roomId = firstRoomId.value;
+      } else {
+        createForm.roomId = currentRoom;
+      }
+      createForm.name = '';
+      createForm.code = '';
+      createForm.location = '';
+    };
+
+    const openCreateDialog = () => {
+      if (!selectedRoomId.value && roomsTree.value.length > 0) {
+        selectedRoomId.value = String(roomsTree.value[0].id || '');
+      }
+      resetCreateForm();
+      createDialogVisible.value = true;
+    };
+
+    const closeCreateDialog = () => {
+      createDialogVisible.value = false;
+      resetCreateForm();
+    };
+
+    const executeCreatePoint = async () => {
+      const roomId = String(createForm.roomId || '').trim();
+      const name = String(createForm.name || '').trim();
+      if (!roomId) {
+        MessagePlugin.error('请选择所属房间');
+        return;
+      }
+      if (!name) {
+        MessagePlugin.error('点位名称不能为空');
+        return;
+      }
+
+      creating.value = true;
+      const loadingMsg = MessagePlugin.loading({ content: '正在新增点位...', duration: 0 });
+      try {
+        const res = await store.dispatch('createPoint', {
+          roomId,
+          name,
+          code: createForm.code,
+          location: createForm.location
+        });
+        if (!res.success) {
+          MessagePlugin.error(res.message || '新增点位失败');
+          return;
+        }
+        MessagePlugin.success('新增点位成功');
+        selectedRoomId.value = roomId;
+        closeCreateDialog();
+        await fetchScenes();
+      } finally {
+        creating.value = false;
+        MessagePlugin.close(loadingMsg);
+      }
+    };
+
+    const openBulkDeleteDialog = () => {
+      if (selectedCount.value === 0) {
+        MessagePlugin.warning('请先选择需要删除的点位');
+        return;
+      }
+      bulkDeleteDialogVisible.value = true;
+    };
+
+    const closeBulkDeleteDialog = () => {
+      bulkDeleteDialogVisible.value = false;
+    };
+
+    const executeBulkDelete = async () => {
+      if (selectedPoints.value.length === 0) {
+        MessagePlugin.warning('请选择需要删除的点位');
+        return;
+      }
+
+      deleting.value = true;
+      const loadingMsg = MessagePlugin.loading({ content: '正在批量删除点位...', duration: 0 });
+      try {
+        const payload = selectedPoints.value.map((point) => ({
+          roomId: point.roomId,
+          pointId: point.id,
+          name: point.name || point.id
+        }));
+        const result = await store.dispatch('deletePointsBatch', { points: payload });
+        const successCount = Number(result?.successCount || 0);
+        const failCount = Number(result?.failCount || 0);
+        const failItems = Array.isArray(result?.failItems) ? result.failItems : [];
+
+        if (failCount === 0) {
+          MessagePlugin.success(`批量删除完成：成功 ${successCount} 项`);
+        } else if (successCount === 0) {
+          const first = failItems[0];
+          MessagePlugin.error(`批量删除失败：共 ${failCount} 项失败${first?.message ? `（示例：${first.message}）` : ''}`);
+        } else {
+          const first = failItems[0];
+          MessagePlugin.warning(`批量删除完成：成功 ${successCount} 项，失败 ${failCount} 项${first?.message ? `（示例：${first.message}）` : ''}`);
+        }
+
+        clearSelection();
+        closeBulkDeleteDialog();
+        await fetchScenes();
+      } finally {
+        deleting.value = false;
+        MessagePlugin.close(loadingMsg);
+      }
     };
 
     const downloadTemplate = () => {
@@ -596,17 +995,35 @@ export default {
       roomsTree,
       currentRoomPoints,
       currentRoomName,
+      basePoints,
+      filteredPoints,
+      pointsHeaderTitle,
+      emptyDescription,
       pagedRoomPoints,
       showGridPagination,
+      backTopStyle,
+      menuActiveRoomId,
       selectedRoomId,
       viewMode,
       gridCurrentPage,
       gridPageSize,
+      searchKeyword,
+      searchScope,
+      multiSelectMode,
+      selectedCount,
+      showBackToTop,
       loading,
       importing,
+      creating,
+      deleting,
       sceneCovers,
       fileInputRef,
+      gridScrollRef,
+      listScrollRef,
 
+      createDialogVisible,
+      bulkDeleteDialogVisible,
+      createForm,
       importDialogVisible,
       confirmDialogVisible,
       confirmKeyword,
@@ -617,8 +1034,21 @@ export default {
       fetchScenes,
       handleGridPageChange,
       handleRoomChange,
+      isPointSelected,
+      togglePointSelection,
+      clearSelection,
+      selectCurrentPage,
+      selectFiltered,
+      toggleMultiSelectMode,
+      scrollToTop,
       triggerUpload,
       handleFileChange,
+      openCreateDialog,
+      closeCreateDialog,
+      executeCreatePoint,
+      openBulkDeleteDialog,
+      closeBulkDeleteDialog,
+      executeBulkDelete,
       downloadTemplate,
       handleImportSelectChange,
       handleImportRemove,
@@ -773,6 +1203,7 @@ export default {
 }
 
 .points-panel {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -800,6 +1231,27 @@ export default {
 .points-header .meta {
   font-size: 12px;
   color: var(--td-text-color-secondary);
+}
+
+.points-search {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.bulk-actions {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--td-component-stroke);
+  background: var(--td-bg-color-secondarycontainer);
+}
+
+.bulk-selected {
+  color: var(--td-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.search-input {
+  width: min(480px, 100%);
 }
 
 .points-panel :deep(.t-loading) {
@@ -887,6 +1339,12 @@ export default {
   padding: 12px;
 }
 
+.scene-select {
+  flex-shrink: 0;
+  margin-right: 8px;
+  padding-top: 2px;
+}
+
 .scene-text {
   flex: 1;
   min-width: 0;
@@ -909,6 +1367,12 @@ export default {
   text-overflow: ellipsis;
 }
 
+.scene-room {
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .scene-actions {
   flex-shrink: 0;
   margin-left: 8px;
@@ -929,6 +1393,10 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.point-select {
+  flex-shrink: 0;
 }
 
 .point-thumb {
@@ -969,6 +1437,12 @@ export default {
   margin-top: 2px;
 }
 
+.point-room {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  margin-top: 2px;
+}
+
 .point-actions {
   flex-shrink: 0;
 }
@@ -986,6 +1460,19 @@ export default {
   padding: 8px 14px 14px;
   border-top: 1px solid var(--td-component-stroke);
   background: var(--td-bg-color-container);
+}
+
+.back-top-btn {
+  position: absolute;
+  right: 16px;
+  z-index: 5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.create-point-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .import-dialog-body {

@@ -1,4 +1,4 @@
-import { getJson, postForm, postJson } from '../../services/apiClient';
+import { deleteJson, getJson, postForm, postJson } from '../../services/apiClient';
 
 const asArray = (data, keys = []) => {
   if (Array.isArray(data)) return data;
@@ -130,6 +130,8 @@ export const actions = {
             name: pointName,
             roomId: rid,
             roomName: room.name || rid,
+            code: point.code || '',
+            location: point.location || '',
             hasStyleImage: point.hasStyleImage === true,
             styleImageId: point.styleImageId || null,
             styleImagePath: point.styleImagePath || null,
@@ -166,8 +168,101 @@ export const actions = {
     return { success: false, message: '当前版本不支持在客户端新增房间，请使用配置导入接口' };
   },
 
+  async createPoint({ dispatch }, { roomId, name, code = '', location = '' } = {}) {
+    try {
+      const rid = String(roomId || '').trim();
+      const pointName = String(name || '').trim();
+      if (!rid) return { success: false, message: '缺少 roomId' };
+      if (!pointName) return { success: false, message: '点位名称不能为空' };
+
+      const payload = { name: pointName };
+      const pointCode = String(code || '').trim();
+      const pointLocation = String(location || '').trim();
+      if (pointCode) payload.code = pointCode;
+      if (pointLocation) payload.location = pointLocation;
+
+      const { ok, data } = await postJson(`/api/rooms/${encodeURIComponent(rid)}/points`, payload);
+      if (!ok || !data || data.success === false) {
+        return { success: false, message: (data && data.message) || '新增点位失败' };
+      }
+
+      await dispatch('fetchRoomsTree');
+      return { success: true, data };
+    } catch (error) {
+      console.error('新增点位失败:', error);
+      return { success: false, message: error.message || '新增点位失败' };
+    }
+  },
+
   async deleteScene() {
     return { success: false, message: '当前版本不支持在前端直接删除房间/点位，请使用导入重建' };
+  },
+
+  async deletePoint({ dispatch }, { roomId, pointId, skipRefresh = false } = {}) {
+    try {
+      const rid = String(roomId || '').trim();
+      const pid = String(pointId || '').trim();
+      if (!rid || !pid) return { success: false, message: '缺少 roomId 或 pointId' };
+
+      const { ok, data } = await deleteJson(`/api/rooms/${encodeURIComponent(rid)}/points/${encodeURIComponent(pid)}`);
+      if (!ok || !data || data.success === false) {
+        return {
+          success: false,
+          message: (data && data.message) || '删除点位失败',
+          counts: data && data.counts ? data.counts : null
+        };
+      }
+
+      if (!skipRefresh) {
+        await dispatch('fetchRoomsTree');
+      }
+      return { success: true, data };
+    } catch (error) {
+      console.error('删除点位失败:', error);
+      return { success: false, message: error.message || '删除点位失败' };
+    }
+  },
+
+  async deletePointsBatch({ dispatch }, { points } = {}) {
+    const list = Array.isArray(points) ? points : [];
+    if (list.length === 0) {
+      return { successCount: 0, failCount: 0, failItems: [] };
+    }
+
+    let successCount = 0;
+    const failItems = [];
+
+    for (const item of list) {
+      const roomId = String(item?.roomId || '').trim();
+      const pointId = String(item?.pointId || '').trim();
+      if (!roomId || !pointId) {
+        failItems.push({
+          roomId,
+          pointId,
+          message: '缺少 roomId 或 pointId'
+        });
+        continue;
+      }
+
+      const res = await dispatch('deletePoint', { roomId, pointId, skipRefresh: true });
+      if (res && res.success) {
+        successCount += 1;
+      } else {
+        failItems.push({
+          roomId,
+          pointId,
+          message: (res && res.message) || '删除点位失败',
+          counts: (res && res.counts) || null
+        });
+      }
+    }
+
+    await dispatch('fetchRoomsTree');
+    return {
+      successCount,
+      failCount: failItems.length,
+      failItems
+    };
   },
 
   async batchDeleteScenes() {
