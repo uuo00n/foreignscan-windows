@@ -37,8 +37,8 @@ export const mutations = {
       let fullPath = null;
       if (record.path) {
         fullPath = apiBaseUrl + record.path;
-      } else if (record.sceneId && record.filename) {
-        fullPath = `${apiBaseUrl}uploads/images/${record.sceneId}/${record.filename}`;
+      } else if (record.roomId && record.pointId && record.filename) {
+        fullPath = `${apiBaseUrl}uploads/images/${record.roomId}/${record.pointId}/${record.filename}`;
       }
       s.currentImage = {
         id: record.id,
@@ -129,7 +129,7 @@ export const actions = {
     }
   },
 
-  async fetchImagesByFilter({ commit, dispatch }, { status, start = null, end = null, sceneId = null } = {}) {
+  async fetchImagesByFilter({ commit, dispatch }, { status, start = null, end = null, roomId = null, pointId = null } = {}) {
     try {
       const isHealthy = await dispatch('checkBackendHealth');
       if (!isHealthy) {
@@ -160,7 +160,8 @@ export const actions = {
       }
       if (start) qs.set('start', start);
       if (end) qs.set('end', end);
-      if (sceneId) qs.set('sceneId', sceneId);
+      if (roomId) qs.set('roomId', roomId);
+      if (pointId) qs.set('pointId', pointId);
 
       const { ok, data } = await getJson(`/api/images/filter?${qs.toString()}`);
       if (ok) {

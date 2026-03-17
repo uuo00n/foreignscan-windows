@@ -17,7 +17,7 @@
         <template #icon>
           <AppIcon />
         </template>
-        场景预览
+        点位列表
       </t-menu-item>
       <t-menu-item value="date-list">
         <template #icon>

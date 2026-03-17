@@ -49,7 +49,7 @@
               />
             </div>
             <div class="record-info">
-              <!-- 场景名：仅展示场景名，不再展示ID -->
+              <!-- 房间/点位名 -->
               <div class="record-scene">{{ getSceneName(record) }}</div>
               <!-- 检测日期：显示在检测时间上方 -->
               <div class="record-date">检测日期：{{ safeDateText(record) }}</div>
@@ -97,7 +97,7 @@ export default {
     };
   },
   computed: {
-    // 引入场景名称映射，用于根据 sceneId 显示场景中文名
+    // 点位名称映射（保留字段名兼容）
     ...mapState(['inspectionRecords', 'currentRecord', 'backendStatus', 'backendError', 'sceneNameMap', 'isBatchMode', 'batchSelectedIds']),
     hasBackendError() {
       return this.backendStatus === 'error';
@@ -164,12 +164,17 @@ export default {
       if (det) return issue ? 'danger' : 'success';
       return 'default';
     },
-    // 仅展示场景名：根据 sceneId 查映射，若无映射则使用 record.sceneName/scene，最后回退“未知场景”
+    // 仅展示房间/点位：根据 pointId 查映射，回退 room/point 字段
     getSceneName(record) {
-      if (!record) return '未知场景';
-      const id = record.sceneId != null ? String(record.sceneId) : null;
-      const byMap = id && this.sceneNameMap ? this.sceneNameMap[id] : null;
-      return byMap || record.sceneName || record.scene || '未知场景';
+      if (!record) return '未知点位';
+      const pointId = record.pointId != null ? String(record.pointId) : null;
+      const byMap = pointId && this.sceneNameMap ? this.sceneNameMap[pointId] : null;
+      if (byMap) return byMap;
+      const room = record.roomName || record.room || record.roomId || '';
+      const point = record.pointName || record.point || record.pointId || '';
+      if (room && point) return `${room} / ${point}`;
+      if (room) return room;
+      return '未知点位';
     },
     // 检测日期显示：优先使用 record.date；其次从 timestamp 格式化；都没有则显示“未知日期”
     safeDateText(record) {
@@ -209,12 +214,12 @@ export default {
     // 首次进入：根据当前标签加载数据
     await this.loadByTab();
     try { await this.$store.dispatch('setListActiveTab', this.activeTab); } catch (_) {}
-    // 并行获取场景名称映射（若后端支持），用于将 sceneId 显示为中文名称
+    // 并行获取点位名称映射（若后端支持）
     try {
       await this.fetchSceneNameMap();
     } catch (e) {
-      // 后端未提供映射或请求失败时忽略，保持“未知场景”回退
-      console.warn('场景名称映射获取失败，已使用回退显示:', e);
+      // 后端未提供映射或请求失败时忽略
+      console.warn('点位名称映射获取失败，已使用回退显示:', e);
     }
     
     // 如果有记录但没有选中的记录，默认选中第一个

@@ -173,8 +173,8 @@ export default {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #fff;
-  border-left: 1px solid #e7e7e7;
+  background-color: var(--td-bg-color-container);
+  border-left: 1px solid var(--td-component-stroke);
 }
 
 .results-card {
@@ -198,8 +198,8 @@ export default {
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 16px;
-  background-color: #f3f3f3;
-  border: 1px solid #e7e7e7;
+  background-color: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-stroke);
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -230,7 +230,7 @@ export default {
   width: 6px;
 }
 .results-content::-webkit-scrollbar-thumb {
-  background-color: #e0e0e0;
+  background-color: var(--td-scrollbar-color, #d9d9d9);
   border-radius: 3px;
 }
 .results-content::-webkit-scrollbar-track {
@@ -261,16 +261,16 @@ export default {
   align-items: center;
   width: 100%;
   padding: 12px;
-  background-color: #f9f9f9;
+  background-color: var(--td-bg-color-secondarycontainer);
   border-radius: 8px;
   transition: all 0.2s ease;
   border: 1px solid transparent;
 }
 
 .result-card:hover {
-  background-color: #fff;
+  background-color: var(--td-bg-color-container);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-color: #e7e7e7;
+  border-color: var(--td-component-stroke);
 }
 
 .result-icon-wrapper {
@@ -285,20 +285,18 @@ export default {
 }
 
 .result-icon-wrapper.success {
-  background-color: #e6f7ff; /* 浅蓝/浅绿，视TDesign success色而定，这里使用浅绿更合适 */
-  background-color: var(--td-brand-color-light); /* 或使用 success 对应的浅色变量 */
-  background-color: #E3F9E9; /* TDesign success light */
-  color: #2BA471; /* TDesign success */
+  background-color: var(--td-success-color-1, #e3f9e9);
+  color: var(--td-success-color-6, #2ba471);
 }
 
 .result-icon-wrapper.danger {
-  background-color: #fcebe8; /* 浅红 */
-  color: #d32029;
+  background-color: var(--td-error-color-1, #fcebe8);
+  color: var(--td-error-color-6, #d54941);
 }
 
 .result-icon-wrapper.warning {
-  background-color: #fff3e8; /* 浅橙 */
-  color: #ed7b2f;
+  background-color: var(--td-warning-color-1, #fff3e8);
+  color: var(--td-warning-color-6, #e37318);
 }
 
 .result-info {
@@ -315,14 +313,14 @@ export default {
 .result-type {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--td-text-color-primary);
 }
 
 .result-meta {
   display: flex;
   align-items: center;
   font-size: 12px;
-  color: #999;
+  color: var(--td-text-color-placeholder);
 }
 
 .result-status {

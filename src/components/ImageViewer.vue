@@ -72,9 +72,14 @@ export default {
       return this.backendStatus === 'error';
     },
     sceneName() {
-      if (!this.currentRecord) return '未知场景';
-      const id = String(this.currentRecord.sceneId);
-      return this.sceneNameMap[id] || id || '未知场景';
+      if (!this.currentRecord) return '未知点位';
+      const pointId = this.currentRecord.pointId != null ? String(this.currentRecord.pointId) : null;
+      if (pointId && this.sceneNameMap[pointId]) return this.sceneNameMap[pointId];
+      const room = this.currentRecord.roomName || this.currentRecord.room || this.currentRecord.roomId || '';
+      const point = this.currentRecord.pointName || this.currentRecord.point || this.currentRecord.pointId || '';
+      if (room && point) return `${room} / ${point}`;
+      if (room) return room;
+      return '未知点位';
     },
     formattedTime() {
       if (!this.currentRecord) return '--';
@@ -178,7 +183,7 @@ export default {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #f0f2f5;
+  background-color: var(--td-bg-color-page);
   height: 100%;
   overflow: hidden;
 }
@@ -186,8 +191,8 @@ export default {
 .viewer-header {
   height: 56px;
   padding: 0 24px;
-  background-color: #fff;
-  border-bottom: 1px solid #e7e7e7;
+  background-color: var(--td-bg-color-container);
+  border-bottom: 1px solid var(--td-component-stroke);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -208,7 +213,7 @@ export default {
 .filename {
   font-size: 16px;
   font-weight: 500;
-  color: #333;
+  color: var(--td-text-color-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -223,13 +228,13 @@ export default {
 
 .time-info {
   font-size: 13px;
-  color: #666;
+  color: var(--td-text-color-secondary);
   display: flex;
   align-items: center;
 }
 
 .time-info .value {
-  color: #333;
+  color: var(--td-text-color-primary);
   font-weight: 500;
   margin-left: 4px;
 }
@@ -250,7 +255,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #fff;
+  background-color: var(--td-bg-color-container);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   overflow: hidden;
@@ -267,8 +272,8 @@ export default {
   padding: 16px;
   display: flex;
   justify-content: center;
-  background-color: #fff;
-  border-top: 1px solid #e7e7e7;
+  background-color: var(--td-bg-color-container);
+  border-top: 1px solid var(--td-component-stroke);
   flex-shrink: 0;
 }
 </style>

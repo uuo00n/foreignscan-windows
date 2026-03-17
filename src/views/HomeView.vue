@@ -72,14 +72,9 @@
         </transition>
 
         <!-- Date List View (Embedded) -->
-        <!-- 使用 v-show 避免 iframe 频繁重载，提升体验 -->
         <transition name="fade-transform">
           <div class="view-container date-view" v-show="activeMenu === 'date-list'">
-            <iframe 
-              src="#/by-date" 
-              style="width: 100%; height: 100%; border: none;"
-              title="Date List"
-            ></iframe>
+            <DateListView :embedded="true" />
           </div>
         </transition>
       </div>
@@ -164,6 +159,7 @@ import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
 import SideMenu from '@/components/SideMenu.vue';
 import ScenePreview from '@/components/ScenePreview.vue';
+import DateListView from '@/views/DateListView.vue';
 import { mapState } from 'vuex';
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next';
 // 引入 TDesign 图标库中的日历图标
@@ -186,7 +182,8 @@ export default {
     RefreshIcon,
     ViewListIcon,
     SideMenu,
-    ScenePreview
+    ScenePreview,
+    DateListView
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
@@ -457,6 +454,17 @@ export default {
 .scene-view {
   flex-direction: column;
   background-color: var(--td-bg-color-page);
+}
+
+.date-view {
+  display: flex;
+  align-items: stretch;
+}
+
+.date-view > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .header-left {
