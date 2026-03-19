@@ -30,20 +30,55 @@ export const mutations = {
 };
 
 export const actions = {
-  async startYOLOForSelected({ dispatch }, { ids = [], config = {} } = {}) {
+  async startYOLOForSelected({ dispatch, rootState }, { ids = [], config = {} } = {}) {
     if (!Array.isArray(ids) || ids.length === 0) return [];
 
     const healthy = await dispatch('checkBackendHealth');
     if (!healthy) throw new Error('backend_unhealthy');
 
     const body = config || {};
+    const records = Array.isArray(rootState.inspectionRecords) ? rootState.inspectionRecords : [];
+    const roomsTree = Array.isArray(rootState.roomsTree) ? rootState.roomsTree : [];
+    const credentialsMap = rootState.detectPadCredentials && typeof rootState.detectPadCredentials === 'object'
+      ? rootState.detectPadCredentials
+      : {};
+    const roomMap = new Map(roomsTree.map((room) => [String(room.id || ''), room]));
+    const recordMap = new Map(records.map((record) => [String(record.id || ''), record]));
+
     const tasks = ids.map((id) => (async () => {
       try {
-        const { ok, data } = await postJson(`/api/images/${id}/detect`, body);
+        const rid = String(id || '').trim();
+        const record = recordMap.get(rid);
+        const roomId = String((record && (record.roomId || record.room_id || (record.room && record.room.id))) || '').trim();
+        if (!roomId) {
+          return { id: rid, ok: false, error: '无法识别图片所属房间，请先刷新列表' };
+        }
+
+        const room = roomMap.get(roomId);
+        const padId = String((room && room.padId) || '').trim();
+        if (!padId) {
+          return { id: rid, ok: false, error: `房间 ${room && (room.name || room.id) ? (room.name || room.id) : roomId} 未绑定 Pad ID` };
+        }
+
+        const credentials = credentialsMap[roomId] || {};
+        const padKey = String(credentials.padKey || '').trim();
+        if (!padKey) {
+          return { id: rid, ok: false, error: `房间 ${room && (room.name || room.id) ? (room.name || room.id) : roomId} 未配置检测 PadKey` };
+        }
+
+        const { ok, data } = await postJson(`/api/images/${rid}/detect`, body, {
+          headers: {
+            'X-Pad-Id': padId,
+            'X-Pad-Key': padKey
+          }
+        });
         const jobId = (data && (data.jobId || data.id || (data.job && (data.job.id || data.job.jobId)))) || null;
-        return { id, ok, jobId };
+        if (!ok) {
+          return { id: rid, ok: false, error: (data && data.message) || '触发检测失败' };
+        }
+        return { id: rid, ok, jobId };
       } catch (error) {
-        return { id, ok: false, error: String(error) };
+        return { id: String(id || ''), ok: false, error: String(error) };
       }
     })());
 

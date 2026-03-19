@@ -39,23 +39,40 @@ export const requestJson = async (path, options = {}) => {
   };
 };
 
-export const getJson = async (path) => requestJson(path, { method: 'GET' });
+export const getJson = async (path, options = {}) => requestJson(path, {
+  ...options,
+  method: 'GET'
+});
 
-export const postJson = async (path, payload = {}) => requestJson(path, {
+export const postJson = async (path, payload = {}, options = {}) => requestJson(path, {
+  ...options,
   method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    ...((options && options.headers) || {})
+  },
+  body: JSON.stringify(payload)
+});
+
+export const postForm = async (path, formData, options = {}) => requestJson(path, {
+  ...options,
+  method: 'POST',
+  body: formData,
+  headers: {
+    ...((options && options.headers) || {})
+  }
+});
+
+export const putJson = async (path, payload = {}) => requestJson(path, {
+  method: 'PUT',
   headers: {
     'Content-Type': 'application/json'
   },
   body: JSON.stringify(payload)
 });
 
-export const postForm = async (path, formData) => requestJson(path, {
-  method: 'POST',
-  body: formData
-});
-
-export const putJson = async (path, payload = {}) => requestJson(path, {
-  method: 'PUT',
+export const patchJson = async (path, payload = {}) => requestJson(path, {
+  method: 'PATCH',
   headers: {
     'Content-Type': 'application/json'
   },

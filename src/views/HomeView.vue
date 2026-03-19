@@ -22,6 +22,13 @@
           >
             {{ isBatchMode ? '退出批量' : '批量处理' }}
           </t-button>
+          <t-button
+            variant="outline"
+            @click="openDetectPadDialog"
+            v-if="activeMenu === 'home'"
+          >
+            检测凭据
+          </t-button>
           <t-button shape="circle" theme="primary" @click="refreshList" title="刷新列表" v-if="activeMenu === 'home'">
             <RefreshIcon size="16" />
           </t-button>
@@ -125,6 +132,41 @@
         </template>
       </t-dialog>
 
+      <t-dialog
+        v-model:visible="detectPadDialogVisible"
+        header="检测 Pad 凭据配置"
+        placement="center"
+        width="720px"
+        :close-on-overlay-click="false"
+      >
+        <div class="detect-pad-dialog">
+          <t-alert
+            theme="info"
+            title="说明"
+            description="检测调用 /api/images/:id/detect 时，会按图片所属房间自动读取 padId（房间配置）和 padKey（此处配置）作为请求头。"
+          />
+          <div class="detect-pad-list" v-if="roomsTree.length > 0">
+            <div class="detect-pad-item" v-for="room in roomsTree" :key="room.id">
+              <div class="room-name">{{ room.name || room.id }}</div>
+              <div class="room-pad-id">Pad ID：{{ room.padId || '未绑定' }}</div>
+              <t-input
+                v-model="detectPadCredentialDraft[String(room.id)]"
+                type="password"
+                :disabled="!room.padId"
+                :placeholder="room.padId ? '请输入该房间 PadKey' : '该房间未绑定 Pad ID'"
+              />
+            </div>
+          </div>
+          <div v-else class="empty-tip">暂无房间配置，请先在点位列表导入房间并绑定 Pad。</div>
+        </div>
+        <template #footer>
+          <t-space>
+            <t-button variant="outline" @click="closeDetectPadDialog">取消</t-button>
+            <t-button theme="primary" @click="saveDetectPadDialog">保存</t-button>
+          </t-space>
+        </template>
+      </t-dialog>
+
     </main>
     
     <footer class="app-footer">
@@ -170,6 +212,8 @@ export default {
     return {
       // 控制识别进度弹窗显示/隐藏
       jobsDialogVisible: false,
+      detectPadDialogVisible: false,
+      detectPadCredentialDraft: {},
       activeMenu: 'home'
     };
   },
@@ -187,7 +231,7 @@ export default {
   },
   computed: {
     // 控制右侧“检测结果”面板的显示与隐藏（默认隐藏）
-    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords', 'listActiveTab', 'isBatchMode']),
+    ...mapState(['showResultsPanel', 'detectJobs', 'backendStatus', 'detectionResults', 'inspectionRecords', 'listActiveTab', 'isBatchMode', 'roomsTree', 'detectPadCredentials']),
     hasDetectJobHistory() {
       const terminal = new Set(['completed', 'failed', 'canceled']);
       return Object.values(this.detectJobs || {}).some((job) => job && terminal.has(job.Status));
@@ -218,6 +262,10 @@ export default {
       const total = list.length;
       return { total, detected, qualified, defect, undetected };
     }
+  },
+  mounted() {
+    this.$store.dispatch('loadDetectPadCredentials');
+    this.$store.dispatch('fetchRoomsTree');
   },
   methods: {
     toggleSidebar() {
@@ -293,6 +341,10 @@ export default {
         }
         if (fail > 0) {
           console.warn('触发失败详情:', result.filter(x => !x.ok));
+          const first = result.find((item) => !item.ok && item.error);
+          if (first && first.error) {
+            MessagePlugin.warning(`失败原因示例：${first.error}`);
+          }
         }
         const okJobs = result.filter(x => x.ok && x.jobId);
         if (ok > 0 && okJobs.length === 0) {
@@ -355,6 +407,38 @@ export default {
     },
     openJobsDialog() {
       this.jobsDialogVisible = true;
+    },
+    openDetectPadDialog() {
+      const next = {};
+      const rooms = Array.isArray(this.roomsTree) ? this.roomsTree : [];
+      const stored = this.detectPadCredentials && typeof this.detectPadCredentials === 'object'
+        ? this.detectPadCredentials
+        : {};
+      rooms.forEach((room) => {
+        const roomId = String(room.id || '');
+        if (!roomId) return;
+        next[roomId] = String((stored[roomId] && stored[roomId].padKey) || '');
+      });
+      this.detectPadCredentialDraft = next;
+      this.detectPadDialogVisible = true;
+    },
+    closeDetectPadDialog() {
+      this.detectPadDialogVisible = false;
+      this.detectPadCredentialDraft = {};
+    },
+    saveDetectPadDialog() {
+      const payload = {};
+      const rooms = Array.isArray(this.roomsTree) ? this.roomsTree : [];
+      rooms.forEach((room) => {
+        const roomId = String(room.id || '');
+        if (!roomId) return;
+        const padKey = String(this.detectPadCredentialDraft[roomId] || '').trim();
+        if (!padKey) return;
+        payload[roomId] = { padKey };
+      });
+      this.$store.dispatch('saveDetectPadCredentials', payload);
+      MessagePlugin.success('检测凭据已保存');
+      this.closeDetectPadDialog();
     },
     clearJobsHistory() {
       const confirmDialog = DialogPlugin.confirm({
@@ -606,5 +690,44 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.detect-pad-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detect-pad-list {
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.detect-pad-item {
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.room-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+}
+
+.room-pad-id {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+}
+
+.empty-tip {
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
 }
 </style>

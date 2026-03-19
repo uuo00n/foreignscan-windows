@@ -7,6 +7,9 @@
             <t-button theme="primary" :disabled="roomsTree.length === 0" @click="openCreateDialog">
               新增点位
             </t-button>
+            <t-button theme="default" :disabled="roomsTree.length === 0" @click="openPadBindingDialog">
+              Pad绑定
+            </t-button>
             <t-button
               :theme="multiSelectMode ? 'primary' : 'default'"
               variant="outline"
@@ -50,7 +53,10 @@
           @change="handleRoomChange"
         >
           <t-menu-item v-for="room in roomsTree" :key="room.id" :value="String(room.id)">
-            {{ room.name || room.id }}
+            <div class="room-item">
+              <span class="room-item-name">{{ room.name || room.id }}</span>
+              <span class="room-item-pad" v-if="room.padId">Pad: {{ room.padId }}</span>
+            </div>
           </t-menu-item>
         </t-menu>
         <div v-else class="rooms-empty">
@@ -60,7 +66,10 @@
 
       <section class="points-panel">
         <div class="points-header" v-if="roomsTree.length > 0">
-          <div class="title">{{ pointsHeaderTitle }}</div>
+          <div class="points-header-left">
+            <div class="title">{{ pointsHeaderTitle }}</div>
+            <div class="pad-hint" v-if="roomPadHint">{{ roomPadHint }}</div>
+          </div>
           <div class="meta">显示 {{ filteredPoints.length }} / {{ basePoints.length }}</div>
         </div>
         <div class="points-search" v-if="roomsTree.length > 0">
@@ -269,6 +278,32 @@
     </t-dialog>
 
     <t-dialog
+      v-model:visible="padDialogVisible"
+      header="房间 Pad 绑定"
+      width="560px"
+      :close-on-overlay-click="false"
+      :close-btn="!bindingPad"
+    >
+      <div class="create-point-body">
+        <t-select v-model="padForm.roomId" placeholder="请选择房间">
+          <t-option v-for="room in roomsTree" :key="room.id" :label="room.name || room.id" :value="String(room.id)" />
+        </t-select>
+        <t-input v-model="padForm.padId" placeholder="Pad ID（必填）" />
+        <t-input
+          v-model="padForm.padKey"
+          type="password"
+          placeholder="Pad Key（必填，提交后仅保存哈希）"
+        />
+      </div>
+      <template #footer>
+        <t-space>
+          <t-button variant="outline" :disabled="bindingPad" @click="closePadBindingDialog">取消</t-button>
+          <t-button theme="primary" :loading="bindingPad" @click="executeBindPad">确认绑定</t-button>
+        </t-space>
+      </template>
+    </t-dialog>
+
+    <t-dialog
       v-model:visible="importDialogVisible"
       header="配置导入中心"
       width="760px"
@@ -438,8 +473,10 @@ export default {
     const importPayload = ref(null);
     const importSummary = reactive({ roomCount: 0, pointCount: 0 });
     const creating = ref(false);
+    const bindingPad = ref(false);
     const deleting = ref(false);
     const createDialogVisible = ref(false);
+    const padDialogVisible = ref(false);
     const bulkDeleteDialogVisible = ref(false);
     const multiSelectMode = ref(false);
     const selectedPointIds = ref([]);
@@ -448,6 +485,11 @@ export default {
       name: '',
       code: '',
       location: ''
+    });
+    const padForm = reactive({
+      roomId: '',
+      padId: '',
+      padKey: ''
     });
 
     const sceneCovers = reactive({});
@@ -478,6 +520,19 @@ export default {
     const currentRoomName = computed(() => {
       const room = roomsTree.value.find((item) => String(item.id || '') === String(selectedRoomId.value));
       return room ? (room.name || room.id) : '未选择房间';
+    });
+    const selectedRoom = computed(() => {
+      return roomsTree.value.find((item) => String(item.id || '') === String(selectedRoomId.value)) || null;
+    });
+    const roomPadHint = computed(() => {
+      if (searchScope.value === 'all') return '';
+      if (!selectedRoom.value) return '';
+      const padId = String(selectedRoom.value.padId || '').trim();
+      const lastSeen = selectedRoom.value.padLastSeenAt ? new Date(selectedRoom.value.padLastSeenAt) : null;
+      const lastSeenText = lastSeen && !Number.isNaN(lastSeen.getTime())
+        ? `，最后在线：${lastSeen.toLocaleString()}`
+        : '';
+      return padId ? `Pad: ${padId}${lastSeenText}` : 'Pad: 未绑定';
     });
     const menuActiveRoomId = computed(() => {
       return searchScope.value === 'all' ? '' : selectedRoomId.value;
@@ -517,7 +572,7 @@ export default {
       return viewMode.value === 'grid' && filteredPoints.value.length > gridPageSize.value;
     });
     const backTopStyle = computed(() => ({
-      bottom: showGridPagination.value ? '76px' : '18px'
+      bottom: showGridPagination.value ? '112px' : '20px'
     }));
     const selectedCount = computed(() => selectedPointIds.value.length);
     const selectedPointIdSet = computed(() => new Set(selectedPointIds.value));
@@ -680,6 +735,12 @@ export default {
       await nextTick();
       bindActiveScrollListener();
     });
+    watch(() => padForm.roomId, (rid) => {
+      if (!padDialogVisible.value) return;
+      const room = roomsTree.value.find((item) => String(item.id || '') === String(rid || ''));
+      padForm.padId = String(room?.padId || '');
+      padForm.padKey = '';
+    });
 
     const handleRoomChange = (value) => {
       if (searchScope.value === 'all') {
@@ -784,6 +845,59 @@ export default {
       createForm.name = '';
       createForm.code = '';
       createForm.location = '';
+    };
+
+    const resetPadForm = () => {
+      const currentRoom = String(selectedRoomId.value || '');
+      const targetRoomId = currentRoom || firstRoomId.value;
+      const targetRoom = roomsTree.value.find((room) => String(room.id || '') === targetRoomId);
+      padForm.roomId = targetRoomId;
+      padForm.padId = String(targetRoom?.padId || '');
+      padForm.padKey = '';
+    };
+
+    const openPadBindingDialog = () => {
+      if (!selectedRoomId.value && roomsTree.value.length > 0) {
+        selectedRoomId.value = String(roomsTree.value[0].id || '');
+      }
+      resetPadForm();
+      padDialogVisible.value = true;
+    };
+
+    const closePadBindingDialog = () => {
+      padDialogVisible.value = false;
+      resetPadForm();
+    };
+
+    const executeBindPad = async () => {
+      const roomId = String(padForm.roomId || '').trim();
+      const padId = String(padForm.padId || '').trim();
+      const padKey = String(padForm.padKey || '').trim();
+      if (!roomId) {
+        MessagePlugin.error('请选择房间');
+        return;
+      }
+      if (!padId || !padKey) {
+        MessagePlugin.error('padId 与 padKey 不能为空');
+        return;
+      }
+
+      bindingPad.value = true;
+      const loadingMsg = MessagePlugin.loading({ content: '正在更新房间 Pad 绑定...', duration: 0 });
+      try {
+        const res = await store.dispatch('updateRoomPadBinding', { roomId, padId, padKey });
+        if (!res.success) {
+          MessagePlugin.error(res.message || '更新 Pad 绑定失败');
+          return;
+        }
+        MessagePlugin.success('Pad 绑定更新成功');
+        selectedRoomId.value = roomId;
+        closePadBindingDialog();
+        await fetchScenes();
+      } finally {
+        bindingPad.value = false;
+        MessagePlugin.close(loadingMsg);
+      }
     };
 
     const openCreateDialog = () => {
@@ -995,6 +1109,7 @@ export default {
       roomsTree,
       currentRoomPoints,
       currentRoomName,
+      roomPadHint,
       basePoints,
       filteredPoints,
       pointsHeaderTitle,
@@ -1015,6 +1130,7 @@ export default {
       loading,
       importing,
       creating,
+      bindingPad,
       deleting,
       sceneCovers,
       fileInputRef,
@@ -1022,8 +1138,10 @@ export default {
       listScrollRef,
 
       createDialogVisible,
+      padDialogVisible,
       bulkDeleteDialogVisible,
       createForm,
+      padForm,
       importDialogVisible,
       confirmDialogVisible,
       confirmKeyword,
@@ -1046,6 +1164,9 @@ export default {
       openCreateDialog,
       closeCreateDialog,
       executeCreatePoint,
+      openPadBindingDialog,
+      closePadBindingDialog,
+      executeBindPad,
       openBulkDeleteDialog,
       closeBulkDeleteDialog,
       executeBulkDelete,
@@ -1168,6 +1289,23 @@ export default {
   font-size: 15px;
 }
 
+.room-item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.room-item-name {
+  line-height: 20px;
+}
+
+.room-item-pad {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  line-height: 16px;
+}
+
 .rooms-menu :deep(.t-menu__item:hover:not(.t-is-active):not(.t-is-opened):not(.t-is-disabled)) {
   background-color: var(--td-bg-color-container-hover);
 }
@@ -1223,9 +1361,19 @@ export default {
   border-bottom: 1px solid var(--td-component-stroke);
 }
 
+.points-header-left {
+  min-width: 0;
+}
+
 .points-header .title {
   font-size: 14px;
   font-weight: 600;
+}
+
+.pad-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
 }
 
 .points-header .meta {
