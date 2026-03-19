@@ -1,4 +1,4 @@
-import { deleteJson, getJson, postForm, postJson } from '../../services/apiClient';
+import { deleteJson, getJson, postForm, postJson, putJson } from '../../services/apiClient';
 
 const asArray = (data, keys = []) => {
   if (Array.isArray(data)) return data;
@@ -17,10 +17,52 @@ const normalizeRooms = (data) => {
   }));
 };
 
+const compactText = (text, max = 160) => {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  if (raw.length <= max) return raw;
+  return `${raw.slice(0, max)}...`;
+};
+
+const detailToText = (detail) => {
+  if (detail == null) return '';
+  if (typeof detail === 'string') return compactText(detail);
+  if (Array.isArray(detail)) {
+    return compactText(detail.map((item) => detailToText(item)).filter(Boolean).join('; '));
+  }
+  if (typeof detail === 'object') {
+    if (typeof detail.message === 'string') return compactText(detail.message);
+    try {
+      return compactText(JSON.stringify(detail));
+    } catch (_) {
+      return compactText(String(detail));
+    }
+  }
+  return compactText(String(detail));
+};
+
+const buildApiErrorMessage = (status, data, fallback) => {
+  const detailText = detailToText(
+    data && typeof data === 'object'
+      ? (data.message ?? data.detail)
+      : data
+  );
+  const codeText = status ? `（HTTP ${status}）` : '';
+  if (status === 404) {
+    return `后端当前版本不支持该接口${codeText}${detailText ? `：${detailText}` : ''}`;
+  }
+  if (detailText) {
+    return `${fallback}${codeText}：${detailText}`;
+  }
+  return `${fallback}${codeText}`.trim();
+};
+
 export const state = () => ({
   sceneNameMap: {}, // pointId -> "房间 / 点位"（保留字段名兼容现有组件）
   scenes: [], // 点位扁平列表（保留字段名兼容现有组件）
   roomsTree: [],
+  roomModelMap: {},
+  roomModelApiError: null,
   roomNameMap: {},
   pointsByRoom: {},
   activeSceneId: null,
@@ -30,6 +72,8 @@ export const state = () => ({
 export const getters = {
   scenes: (s) => s.scenes,
   roomsTree: (s) => s.roomsTree,
+  roomModelMap: (s) => s.roomModelMap || {},
+  roomModelApiError: (s) => s.roomModelApiError,
   pointsByRoom: (s) => s.pointsByRoom,
   roomNameMap: (s) => s.roomNameMap
 };
@@ -46,6 +90,20 @@ export const mutations = {
   },
   SET_ROOMS_TREE(s, rooms) {
     s.roomsTree = rooms || [];
+  },
+  SET_ROOM_MODEL_MAP(s, map) {
+    s.roomModelMap = map && typeof map === 'object' ? map : {};
+  },
+  SET_ROOM_MODEL_API_ERROR(s, payload) {
+    if (!payload || typeof payload !== 'object') {
+      s.roomModelApiError = null;
+      return;
+    }
+    s.roomModelApiError = {
+      status: Number(payload.status) || 0,
+      message: String(payload.message || '').trim(),
+      detail: payload.detail ?? null
+    };
   },
   SET_ROOM_NAME_MAP(s, map) {
     s.roomNameMap = map || {};
@@ -285,6 +343,88 @@ export const actions = {
 
   async batchDeleteScenes() {
     return { success: false, message: '当前版本不支持批量删除，请使用导入重建' };
+  },
+
+  async fetchRoomModels({ commit, dispatch }) {
+    try {
+      const healthy = await dispatch('checkBackendHealth');
+      if (!healthy) {
+        commit('SET_ROOM_MODEL_MAP', {});
+        commit('SET_ROOM_MODEL_API_ERROR', {
+          status: 0,
+          message: '后端不可用，无法获取模型映射'
+        });
+        return {};
+      }
+      const { ok, status, data } = await getJson('/api/room-models');
+      if (!ok || !data || data.success === false) {
+        commit('SET_ROOM_MODEL_MAP', {});
+        commit('SET_ROOM_MODEL_API_ERROR', {
+          status,
+          message: buildApiErrorMessage(status, data, '获取房间模型映射失败'),
+          detail: data
+        });
+        return {};
+      }
+      const map = data.roomModels && typeof data.roomModels === 'object' ? data.roomModels : {};
+      commit('SET_ROOM_MODEL_MAP', map);
+      commit('SET_ROOM_MODEL_API_ERROR', null);
+      return map;
+    } catch (error) {
+      console.error('获取房间模型映射失败:', error);
+      commit('SET_ROOM_MODEL_MAP', {});
+      commit('SET_ROOM_MODEL_API_ERROR', {
+        status: 0,
+        message: error.message || '获取房间模型映射失败'
+      });
+      return {};
+    }
+  },
+
+  async bindRoomModel({ dispatch }, { roomId, modelPath } = {}) {
+    try {
+      const rid = String(roomId || '').trim();
+      const mpath = String(modelPath || '').trim();
+      if (!rid) return { success: false, message: '缺少 roomId' };
+      if (!mpath) return { success: false, message: '请选择模型路径' };
+
+      const { ok, status, data } = await putJson(`/api/room-models/${encodeURIComponent(rid)}`, { modelPath: mpath });
+      if (!ok || !data || data.success === false) {
+        return {
+          success: false,
+          status,
+          data,
+          message: buildApiErrorMessage(status, data, '绑定失败')
+        };
+      }
+      await dispatch('fetchRoomModels');
+      return { success: true, data };
+    } catch (error) {
+      console.error('绑定房间模型失败:', error);
+      return { success: false, message: error.message || '绑定失败' };
+    }
+  },
+
+  async unbindRoomModel({ dispatch }, { roomId } = {}) {
+    try {
+      const rid = String(roomId || '').trim();
+      if (!rid) return { success: false, message: '缺少 roomId' };
+
+      const { ok, status, data } = await deleteJson(`/api/room-models/${encodeURIComponent(rid)}`);
+      if (!ok || !data || data.success === false) {
+        return {
+          success: false,
+          status,
+          data,
+          message: buildApiErrorMessage(status, data, '解绑失败')
+        };
+      }
+      await dispatch('fetchRoomModels');
+      return { success: true, data };
+    } catch (error) {
+      console.error('解绑房间模型失败:', error);
+      return { success: false, message: error.message || '解绑失败' };
+    }
   },
 
   async importRoomsConfig({ dispatch }, payload) {

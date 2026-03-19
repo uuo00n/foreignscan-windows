@@ -1,14 +1,26 @@
 <template>
   <aside class="rooms-panel">
-    <div class="rooms-title">{{ title }}</div>
+    <div class="rooms-head">
+      <div class="rooms-title">{{ title }}</div>
+      <t-radio-group
+        class="rooms-sort"
+        size="small"
+        variant="default-filled"
+        :value="normalizedSortOrder"
+        @change="handleSortChange"
+      >
+        <t-radio-button value="asc">名称升序</t-radio-button>
+        <t-radio-button value="desc">名称降序</t-radio-button>
+      </t-radio-group>
+    </div>
     <t-menu
-      v-if="rooms.length > 0"
+      v-if="sortedRooms.length > 0"
       :value="menuValue"
       width="100%"
       class="rooms-menu"
       @change="handleChange"
     >
-      <t-menu-item v-for="room in rooms" :key="room.id" :value="String(room.id)">
+      <t-menu-item v-for="room in sortedRooms" :key="room.id" :value="String(room.id)">
         <div class="room-item">
           <span class="room-item-name">{{ room.name || room.id }}</span>
           <span class="room-item-pad" v-if="showPad && room.padId">Pad: {{ room.padId }}</span>
@@ -44,17 +56,50 @@ export default {
     showPad: {
       type: Boolean,
       default: true
+    },
+    sortOrder: {
+      type: String,
+      default: 'asc'
     }
   },
-  emits: ['change'],
+  emits: ['change', 'update:sortOrder'],
   computed: {
     menuValue() {
       return String(this.value || '');
+    },
+    normalizedSortOrder() {
+      return this.sortOrder === 'desc' ? 'desc' : 'asc';
+    },
+    sortedRooms() {
+      const rooms = Array.isArray(this.rooms) ? [...this.rooms] : [];
+      const multiplier = this.normalizedSortOrder === 'desc' ? -1 : 1;
+      return rooms.sort((a, b) => {
+        const aName = String((a && (a.name || a.id)) || '');
+        const bName = String((b && (b.name || b.id)) || '');
+        const nameCompare = aName.localeCompare(bName, 'zh-CN', {
+          numeric: true,
+          sensitivity: 'base'
+        });
+        if (nameCompare !== 0) {
+          return nameCompare * multiplier;
+        }
+        const aId = String((a && a.id) || '');
+        const bId = String((b && b.id) || '');
+        const idCompare = aId.localeCompare(bId, 'zh-CN', {
+          numeric: true,
+          sensitivity: 'base'
+        });
+        return idCompare * multiplier;
+      });
     }
   },
   methods: {
     handleChange(value) {
       this.$emit('change', String(value || ''));
+    },
+    handleSortChange(value) {
+      const next = value === 'desc' ? 'desc' : 'asc';
+      this.$emit('update:sortOrder', next);
     }
   }
 };
@@ -74,12 +119,27 @@ export default {
   overflow: hidden;
 }
 
-.rooms-title {
+.rooms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 14px 16px;
+  border-bottom: 1px solid var(--td-component-stroke);
+}
+
+.rooms-title {
   font-size: 14px;
   font-weight: 700;
-  border-bottom: 1px solid var(--td-component-stroke);
   color: var(--td-text-color-primary);
+}
+
+.rooms-sort {
+  flex-shrink: 0;
+}
+
+.rooms-sort :deep(.t-radio-group) {
+  flex-wrap: nowrap;
 }
 
 .rooms-menu {

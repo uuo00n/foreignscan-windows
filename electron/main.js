@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fetch = require('node-fetch');
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -15,8 +15,8 @@ function createWindow() {
     height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true
     }
   });
 
@@ -135,5 +135,22 @@ ipcMain.handle('run-detection', async (event, payload) => {
   } catch (error) {
     console.error('图片检测失败:', error);
     return [];
+  }
+});
+
+ipcMain.handle('pick-model-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow || undefined, {
+      title: '选择 PT 模型文件',
+      properties: ['openFile'],
+      filters: [{ name: 'PyTorch Model', extensions: ['pt'] }]
+    });
+    if (result.canceled || !Array.isArray(result.filePaths) || result.filePaths.length === 0) {
+      return { canceled: true, path: '' };
+    }
+    return { canceled: false, path: result.filePaths[0] };
+  } catch (error) {
+    console.error('打开模型文件选择器失败:', error);
+    return { canceled: true, path: '', error: error.message || 'open dialog failed' };
   }
 });

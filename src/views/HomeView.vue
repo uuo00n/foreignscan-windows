@@ -85,6 +85,13 @@
           </div>
         </transition>
 
+        <!-- Model Binding View -->
+        <transition name="fade-transform">
+          <div class="view-container scene-view" v-if="activeMenu === 'model-binding'">
+            <ModelBindingView />
+          </div>
+        </transition>
+
         <!-- Date List View (Embedded) -->
         <transition name="fade-transform">
           <div class="view-container date-view" v-show="activeMenu === 'date-list'">
@@ -141,7 +148,7 @@
 
       <t-dialog
         v-model:visible="detectPadDialogVisible"
-        header="检测 Pad 凭据配置"
+        header="检测设备凭据配置"
         placement="center"
         width="720px"
         :close-on-overlay-click="false"
@@ -150,21 +157,21 @@
           <t-alert
             theme="info"
             title="说明"
-            description="检测调用 /api/images/:id/detect 时，会按图片所属房间自动读取 padId（房间配置）和 padKey（此处配置）作为请求头。"
+            description="检测调用 /api/images/:id/detect 时，会按图片所属房间自动读取设备ID（房间配置）和设备密钥（此处配置）作为请求头。"
           />
           <div class="detect-pad-list" v-if="roomsTree.length > 0">
             <div class="detect-pad-item" v-for="room in roomsTree" :key="room.id">
               <div class="room-name">{{ room.name || room.id }}</div>
-              <div class="room-pad-id">Pad ID：{{ room.padId || '未绑定' }}</div>
+              <div class="room-pad-id">设备 ID：{{ room.padId || '未绑定' }}</div>
               <t-input
                 v-model="detectPadCredentialDraft[String(room.id)]"
                 type="password"
                 :disabled="!room.padId"
-                :placeholder="room.padId ? '请输入该房间 PadKey' : '该房间未绑定 Pad ID'"
+                :placeholder="room.padId ? '请输入该房间设备密钥' : '该房间未绑定设备 ID'"
               />
             </div>
           </div>
-          <div v-else class="empty-tip">暂无房间配置，请先在点位列表导入房间并绑定 Pad。</div>
+          <div v-else class="empty-tip">暂无房间配置，请先在点位列表导入房间并绑定设备。</div>
         </div>
         <template #footer>
           <t-space>
@@ -214,6 +221,7 @@ import DetectionResults from '@/components/DetectionResults.vue';
 import SideMenu from '@/components/SideMenu.vue';
 import ScenePreview from '@/components/ScenePreview.vue';
 import PadBindingView from '@/views/PadBindingView.vue';
+import ModelBindingView from '@/views/ModelBindingView.vue';
 import DateListView from '@/views/DateListView.vue';
 import { mapState } from 'vuex';
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next';
@@ -242,6 +250,7 @@ export default {
     SideMenu,
     ScenePreview,
     PadBindingView,
+    ModelBindingView,
     DateListView
   },
   computed: {

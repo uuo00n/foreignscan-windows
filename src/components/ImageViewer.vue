@@ -51,10 +51,6 @@
 <script>
 import { mapState, mapActions } from 'vuex';
 
-// 条件导入 Electron，避免在浏览器环境中报错
-const electron = window.require ? window.require('electron') : null;
-const ipcRenderer = electron ? electron.ipcRenderer : null;
-
 export default {
   name: 'ImageViewer',
   computed: {

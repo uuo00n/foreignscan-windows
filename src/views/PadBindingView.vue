@@ -4,13 +4,14 @@
       <RoomListPanel
         :rooms="roomsTree"
         :value="selectedRoomId"
+        v-model:sortOrder="roomSortOrder"
         @change="handleRoomChange"
       />
 
       <section class="binding-panel">
         <div class="binding-header">
           <div class="header-main">
-            <div class="title">房间绑定码</div>
+            <div class="title">房间设备绑定</div>
             <div class="meta" v-if="selectedRoom">当前房间：{{ selectedRoom.name || selectedRoom.id }}</div>
           </div>
           <div class="header-actions">
@@ -76,7 +77,7 @@
         <t-alert
           theme="info"
           title="绑定说明"
-          message="绑定码由 Windows 端按房间生成，Pad 输入绑定码后完成绑定。绑定码 10 分钟内有效，且仅可使用一次。"
+          message="绑定码由 Windows 端按房间生成，设备输入绑定码后完成绑定。绑定码 10 分钟内有效，且仅可使用一次。"
         />
         <t-steps
           class="guide-steps"
@@ -87,8 +88,8 @@
         />
         <t-card class="guide-card" :bordered="true">
           <p>1. 重新生成绑定码会使同房间旧绑定码立即失效。</p>
-          <p>2. 请在有效期内完成 Pad 端输入，过期后需重新生成。</p>
-          <p>3. 完成绑定后，可在“当前已绑定 Pad”处查看房间绑定状态。</p>
+          <p>2. 请在有效期内完成设备端输入，过期后需重新生成。</p>
+          <p>3. 完成绑定后，可在“当前已绑定设备”处查看房间绑定状态。</p>
         </t-card>
       </div>
       <template #footer>
@@ -116,6 +117,7 @@ export default {
     const generating = ref(false);
     const guideDialogVisible = ref(false);
     const selectedRoomId = ref('');
+    const roomSortOrder = ref('asc');
     const bindKey = ref('');
     const expiresAt = ref('');
     const nowTs = ref(Date.now());
@@ -135,7 +137,7 @@ export default {
       const lastSeenText = lastSeen && !Number.isNaN(lastSeen.getTime())
         ? `，最后在线：${lastSeen.toLocaleString()}`
         : '';
-      return padId ? `当前已绑定 Pad：${padId}${lastSeenText}` : '当前房间尚未绑定 Pad。';
+      return padId ? `当前已绑定设备：${padId}${lastSeenText}` : '当前房间尚未绑定设备。';
     });
 
     const expiresAtTs = computed(() => {
@@ -170,8 +172,8 @@ export default {
     const guideSteps = computed(() => ([
       { value: 0, title: '选择房间', content: '在左侧房间列表选择目标房间。' },
       { value: 1, title: '生成绑定码', content: '点击“生成绑定码”，获取该房间一次性绑定码。' },
-      { value: 2, title: 'Pad 输入绑定码', content: '在 Pad 端配置页面输入绑定码完成绑定。' },
-      { value: 3, title: '验证结果', content: '回到 Windows 查看“当前已绑定 Pad”和在线信息。' }
+      { value: 2, title: '设备输入绑定码', content: '在设备端配置页面输入绑定码完成绑定。' },
+      { value: 3, title: '验证结果', content: '回到 Windows 查看“当前已绑定设备”和在线信息。' }
     ]));
 
     const syncSelection = () => {
@@ -363,6 +365,7 @@ export default {
       generating,
       guideDialogVisible,
       selectedRoomId,
+      roomSortOrder,
       roomsTree,
       selectedRoom,
       roomHintText,

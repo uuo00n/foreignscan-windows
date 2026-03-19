@@ -21,9 +21,15 @@
       </t-menu-item>
       <t-menu-item value="pad-binding">
         <template #icon>
+          <DeviceIcon />
+        </template>
+        设备绑定
+      </t-menu-item>
+      <t-menu-item value="model-binding">
+        <template #icon>
           <SettingIcon />
         </template>
-        Pad绑定
+        模型绑定
       </t-menu-item>
       <t-menu-item value="date-list">
         <template #icon>
@@ -38,7 +44,7 @@
 <script>
 import { computed } from 'vue';
 import { useStore } from 'vuex';
-import { DashboardIcon, AppIcon, CalendarIcon, SettingIcon } from 'tdesign-icons-vue-next';
+import { DashboardIcon, AppIcon, CalendarIcon, SettingIcon, DeviceIcon } from 'tdesign-icons-vue-next';
 
 export default {
   name: 'SideMenu',
@@ -46,7 +52,8 @@ export default {
     DashboardIcon,
     AppIcon,
     CalendarIcon,
-    SettingIcon
+    SettingIcon,
+    DeviceIcon
   },
   props: {
     value: {

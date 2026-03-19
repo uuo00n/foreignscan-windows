@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 新命名，便于后续统一
   getImages: () => ipcRenderer.invoke('get-images'),
   // 运行检测
-  runDetection: (payload) => ipcRenderer.invoke('run-detection', payload)
+  runDetection: (payload) => ipcRenderer.invoke('run-detection', payload),
+  // 选择模型文件
+  pickModelFile: () => ipcRenderer.invoke('pick-model-file')
 })

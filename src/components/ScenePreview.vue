@@ -43,6 +43,7 @@
       <RoomListPanel
         :rooms="roomsTree"
         :value="menuActiveRoomId"
+        v-model:sortOrder="roomSortOrder"
         @change="handleRoomChange"
       />
 
@@ -224,7 +225,7 @@
     >
       <div class="create-point-body">
         <t-select v-model="createForm.roomId" placeholder="请选择所属房间">
-          <t-option v-for="room in roomsTree" :key="room.id" :label="room.name || room.id" :value="String(room.id)" />
+          <t-option v-for="room in sortedRoomsForSelect" :key="room.id" :label="room.name || room.id" :value="String(room.id)" />
         </t-select>
         <t-input v-model="createForm.name" placeholder="点位名称（必填）" />
         <t-input v-model="createForm.code" placeholder="点位编码（可选）" />
@@ -410,6 +411,25 @@ const normalizeImportPayload = (raw) => {
   return { rooms };
 };
 
+const compareRoomDisplayName = (a, b, sortOrder = 'asc') => {
+  const direction = sortOrder === 'desc' ? -1 : 1;
+  const aName = String((a && (a.name || a.id)) || '');
+  const bName = String((b && (b.name || b.id)) || '');
+  const nameCompare = aName.localeCompare(bName, 'zh-CN', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+  if (nameCompare !== 0) {
+    return nameCompare * direction;
+  }
+  const aId = String((a && a.id) || '');
+  const bId = String((b && b.id) || '');
+  return aId.localeCompare(bId, 'zh-CN', {
+    numeric: true,
+    sensitivity: 'base'
+  }) * direction;
+};
+
 export default {
   name: 'ScenePreview',
   components: {
@@ -457,11 +477,17 @@ export default {
     const gridPageSize = ref(24);
     const searchKeyword = ref('');
     const searchScope = ref('room');
+    const roomSortOrder = ref('asc');
 
     const scenes = computed(() => store.getters.scenes || []);
     const roomsTree = computed(() => store.getters.roomsTree || []);
+    const sortedRoomsForSelect = computed(() => {
+      const order = roomSortOrder.value === 'desc' ? 'desc' : 'asc';
+      const rooms = Array.isArray(roomsTree.value) ? [...roomsTree.value] : [];
+      return rooms.sort((a, b) => compareRoomDisplayName(a, b, order));
+    });
     const firstRoomId = computed(() => {
-      const room = Array.isArray(roomsTree.value) ? roomsTree.value[0] : null;
+      const room = Array.isArray(sortedRoomsForSelect.value) ? sortedRoomsForSelect.value[0] : null;
       return room ? String(room.id || '') : '';
     });
 
@@ -1000,6 +1026,8 @@ export default {
       gridPageSize,
       searchKeyword,
       searchScope,
+      roomSortOrder,
+      sortedRoomsForSelect,
       multiSelectMode,
       selectedCount,
       showBackToTop,
