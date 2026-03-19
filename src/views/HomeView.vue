@@ -78,6 +78,13 @@
           </div>
         </transition>
 
+        <!-- Pad Binding View -->
+        <transition name="fade-transform">
+          <div class="view-container scene-view" v-if="activeMenu === 'pad-binding'">
+            <PadBindingView />
+          </div>
+        </transition>
+
         <!-- Date List View (Embedded) -->
         <transition name="fade-transform">
           <div class="view-container date-view" v-show="activeMenu === 'date-list'">
@@ -170,6 +177,11 @@
     </main>
     
     <footer class="app-footer">
+      <div class="footer-left">
+        <t-button class="progress-btn" variant="outline" size="small" theme="primary" shape="round" @click="openJobsDialog" title="查看识别任务进度">
+          任务进度
+        </t-button>
+      </div>
       <div class="status-info">
         <template v-if="listActiveTab==='undetected'">
           <div class="status-item"><span class="label">未检测数量:</span><span class="value">{{ counts.undetected }}</span></div>
@@ -185,11 +197,11 @@
           <div class="status-item"><span class="label">未检测数量:</span><span class="value">{{ counts.undetected }}</span></div>
           <div class="status-item"><span class="label">合格数量:</span><span class="value">{{ counts.qualified }}</span></div>
           <div class="status-item"><span class="label">缺陷数量:</span><span class="value">{{ counts.defect }}</span></div>
-        
         </template>
-        <t-button class="progress-btn" variant="outline" size="small" theme="primary" shape="round" @click="openJobsDialog" title="查看识别任务进度">
-          任务进度
-        </t-button>
+      </div>
+      <div class="footer-right">
+        <span class="backend-label">后端地址:</span>
+        <span class="backend-value">{{ backendHostPort }}</span>
       </div>
     </footer>
   </div>
@@ -201,9 +213,11 @@ import ImageViewer from '@/components/ImageViewer.vue';
 import DetectionResults from '@/components/DetectionResults.vue';
 import SideMenu from '@/components/SideMenu.vue';
 import ScenePreview from '@/components/ScenePreview.vue';
+import PadBindingView from '@/views/PadBindingView.vue';
 import DateListView from '@/views/DateListView.vue';
 import { mapState } from 'vuex';
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next';
+import { apiBaseUrl } from '@/services/apiClient';
 // 引入 TDesign 图标库中的日历图标
 import { CalendarIcon, RefreshIcon, ViewListIcon } from 'tdesign-icons-vue-next';
 
@@ -227,6 +241,7 @@ export default {
     ViewListIcon,
     SideMenu,
     ScenePreview,
+    PadBindingView,
     DateListView
   },
   computed: {
@@ -261,6 +276,20 @@ export default {
       const detected = qualified + defect;
       const total = list.length;
       return { total, detected, qualified, defect, undetected };
+    },
+    backendHostPort() {
+      const raw = String(apiBaseUrl || '').trim();
+      if (!raw) return '--';
+      try {
+        const target = raw.startsWith('http://') || raw.startsWith('https://') ? raw : `http://${raw}`;
+        const parsed = new URL(target);
+        return parsed.host || '--';
+      } catch (_) {
+        const cleaned = raw.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+        if (!cleaned) return '--';
+        const slashIdx = cleaned.indexOf('/');
+        return slashIdx >= 0 ? cleaned.slice(0, slashIdx) : cleaned;
+      }
     }
   },
   mounted() {
@@ -621,10 +650,36 @@ export default {
   border-top: 1px solid var(--td-component-stroke);
 }
 
+.footer-left {
+  display: flex;
+  align-items: center;
+  min-width: 96px;
+}
+
 .status-info {
   display: flex;
+  flex: 1;
+  justify-content: center;
   gap: 24px;
   color: var(--td-text-color-secondary);
+  min-width: 0;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 160px;
+  gap: 6px;
+}
+
+.backend-label {
+  color: var(--td-text-color-placeholder);
+}
+
+.backend-value {
+  color: var(--td-text-color-primary);
+  font-weight: 500;
 }
 
 .status-item {

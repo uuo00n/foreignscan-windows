@@ -81,4 +81,11 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* 让顶部/底部（left:50%）消息列表中的每条消息都单独居中，避免短消息左贴齐 */
+.t-message__list[style*='left: 50%'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 </style>

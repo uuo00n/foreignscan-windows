@@ -1,4 +1,4 @@
-import { deleteJson, getJson, patchJson, postForm, postJson } from '../../services/apiClient';
+import { deleteJson, getJson, postForm, postJson } from '../../services/apiClient';
 
 const asArray = (data, keys = []) => {
   if (Array.isArray(data)) return data;
@@ -168,27 +168,21 @@ export const actions = {
     return { success: false, message: '当前版本不支持在客户端新增房间，请使用配置导入接口' };
   },
 
-  async updateRoomPadBinding({ dispatch }, { roomId, padId, padKey } = {}) {
+  async createRoomPadBindingKey({ dispatch }, { roomId } = {}) {
     try {
       const rid = String(roomId || '').trim();
-      const pid = String(padId || '').trim();
-      const pkey = String(padKey || '').trim();
       if (!rid) return { success: false, message: '缺少 roomId' };
-      if (!pid || !pkey) return { success: false, message: 'padId 与 padKey 不能为空' };
 
-      const { ok, data } = await patchJson(`/api/rooms/${encodeURIComponent(rid)}/pad-binding`, {
-        padId: pid,
-        padKey: pkey
-      });
+      const { ok, data } = await postJson(`/api/rooms/${encodeURIComponent(rid)}/pad-binding-keys`, {});
       if (!ok || !data || data.success === false) {
-        return { success: false, message: (data && data.message) || '更新 Pad 绑定失败' };
+        return { success: false, message: (data && data.message) || '生成绑定码失败' };
       }
 
       await dispatch('fetchRoomsTree');
       return { success: true, data };
     } catch (error) {
-      console.error('更新房间 Pad 绑定失败:', error);
-      return { success: false, message: error.message || '更新 Pad 绑定失败' };
+      console.error('生成房间 Pad 绑定码失败:', error);
+      return { success: false, message: error.message || '生成绑定码失败' };
     }
   },
 

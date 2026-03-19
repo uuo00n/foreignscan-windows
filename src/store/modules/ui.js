@@ -1,6 +1,7 @@
 import { getJson } from '../../services/apiClient';
 
 const DETECT_PAD_CREDENTIALS_KEY = 'detect_pad_credentials_v1';
+const PAD_BINDING_PREVIEW_KEY = 'pad_binding_preview_v1';
 
 const loadCredentialsFromStorage = () => {
   if (typeof window === 'undefined' || !window.localStorage) return {};
@@ -24,6 +25,50 @@ const saveCredentialsToStorage = (map) => {
   }
 };
 
+const toTs = (raw) => {
+  if (!raw) return 0;
+  const ts = new Date(raw).getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
+const normalizePadBindingPreview = (map) => {
+  if (!map || typeof map !== 'object') return {};
+  const now = Date.now();
+  const next = {};
+  Object.entries(map).forEach(([roomId, item]) => {
+    const rid = String(roomId || '').trim();
+    const bindKey = String(item?.bindKey || '').trim();
+    const expiresAt = String(item?.expiresAt || '').trim();
+    if (!rid || !bindKey || !expiresAt) return;
+    const expiresTs = toTs(expiresAt);
+    if (!expiresTs || expiresTs <= now) return;
+    next[rid] = { bindKey, expiresAt };
+  });
+  return next;
+};
+
+const loadPadBindingPreviewFromStorage = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return {};
+  try {
+    const raw = window.localStorage.getItem(PAD_BINDING_PREVIEW_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return normalizePadBindingPreview(parsed);
+  } catch (_) {
+    return {};
+  }
+};
+
+const savePadBindingPreviewToStorage = (map) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const normalized = normalizePadBindingPreview(map);
+    window.localStorage.setItem(PAD_BINDING_PREVIEW_KEY, JSON.stringify(normalized));
+  } catch (_) {
+    // ignore storage failures
+  }
+};
+
 export const state = () => ({
   showResultsPanel: false,
   backendStatus: 'unknown',
@@ -32,7 +77,8 @@ export const state = () => ({
   isBatchMode: false,
   batchSelectedIds: [],
   sidebarCollapsed: false,
-  detectPadCredentials: loadCredentialsFromStorage()
+  detectPadCredentials: loadCredentialsFromStorage(),
+  padBindingPreviewByRoom: loadPadBindingPreviewFromStorage()
 });
 
 export const getters = {
@@ -40,7 +86,8 @@ export const getters = {
   isBatchMode: (s) => s.isBatchMode,
   batchSelectedIds: (s) => s.batchSelectedIds,
   sidebarCollapsed: (s) => s.sidebarCollapsed,
-  detectPadCredentials: (s) => s.detectPadCredentials || {}
+  detectPadCredentials: (s) => s.detectPadCredentials || {},
+  padBindingPreviewByRoom: (s) => s.padBindingPreviewByRoom || {}
 };
 
 export const mutations = {
@@ -76,6 +123,9 @@ export const mutations = {
   },
   SET_DETECT_PAD_CREDENTIALS(s, map) {
     s.detectPadCredentials = map && typeof map === 'object' ? map : {};
+  },
+  SET_PAD_BINDING_PREVIEW_BY_ROOM(s, map) {
+    s.padBindingPreviewByRoom = normalizePadBindingPreview(map);
   }
 };
 
@@ -108,6 +158,37 @@ export const actions = {
     commit('SET_DETECT_PAD_CREDENTIALS', payload);
     saveCredentialsToStorage(payload);
     return payload;
+  },
+  loadPadBindingPreview({ commit }) {
+    const map = loadPadBindingPreviewFromStorage();
+    commit('SET_PAD_BINDING_PREVIEW_BY_ROOM', map);
+    savePadBindingPreviewToStorage(map);
+    return map;
+  },
+  savePadBindingPreview({ commit, state }, { roomId, bindKey, expiresAt } = {}) {
+    const rid = String(roomId || '').trim();
+    const key = String(bindKey || '').trim();
+    const exp = String(expiresAt || '').trim();
+    const current = normalizePadBindingPreview(state.padBindingPreviewByRoom);
+    if (!rid) {
+      commit('SET_PAD_BINDING_PREVIEW_BY_ROOM', current);
+      savePadBindingPreviewToStorage(current);
+      return current;
+    }
+    if (!key || !exp) {
+      delete current[rid];
+      commit('SET_PAD_BINDING_PREVIEW_BY_ROOM', current);
+      savePadBindingPreviewToStorage(current);
+      return current;
+    }
+    current[rid] = { bindKey: key, expiresAt: exp };
+    const normalized = normalizePadBindingPreview(current);
+    commit('SET_PAD_BINDING_PREVIEW_BY_ROOM', normalized);
+    savePadBindingPreviewToStorage(normalized);
+    return normalized;
+  },
+  clearPadBindingPreview({ dispatch }, { roomId } = {}) {
+    return dispatch('savePadBindingPreview', { roomId, bindKey: '', expiresAt: '' });
   },
   setListActiveTab({ commit }, tab) {
     commit('SET_LIST_ACTIVE_TAB', tab);

@@ -7,9 +7,6 @@
             <t-button theme="primary" :disabled="roomsTree.length === 0" @click="openCreateDialog">
               新增点位
             </t-button>
-            <t-button theme="default" :disabled="roomsTree.length === 0" @click="openPadBindingDialog">
-              Pad绑定
-            </t-button>
             <t-button
               :theme="multiSelectMode ? 'primary' : 'default'"
               variant="outline"
@@ -43,32 +40,16 @@
     </t-card>
 
     <div class="content-layout">
-      <aside class="rooms-panel">
-        <div class="rooms-title">房间列表</div>
-        <t-menu
-          v-if="roomsTree.length > 0"
-          :value="menuActiveRoomId"
-          width="100%"
-          class="rooms-menu"
-          @change="handleRoomChange"
-        >
-          <t-menu-item v-for="room in roomsTree" :key="room.id" :value="String(room.id)">
-            <div class="room-item">
-              <span class="room-item-name">{{ room.name || room.id }}</span>
-              <span class="room-item-pad" v-if="room.padId">Pad: {{ room.padId }}</span>
-            </div>
-          </t-menu-item>
-        </t-menu>
-        <div v-else class="rooms-empty">
-          <t-empty description="暂无房间数据" />
-        </div>
-      </aside>
+      <RoomListPanel
+        :rooms="roomsTree"
+        :value="menuActiveRoomId"
+        @change="handleRoomChange"
+      />
 
       <section class="points-panel">
         <div class="points-header" v-if="roomsTree.length > 0">
           <div class="points-header-left">
             <div class="title">{{ pointsHeaderTitle }}</div>
-            <div class="pad-hint" v-if="roomPadHint">{{ roomPadHint }}</div>
           </div>
           <div class="meta">显示 {{ filteredPoints.length }} / {{ basePoints.length }}</div>
         </div>
@@ -106,121 +87,123 @@
 
         <t-loading :loading="loading">
           <div class="points-content">
-            <template v-if="filteredPoints.length > 0">
-              <template v-if="viewMode === 'grid'">
-                <div class="scene-grid" ref="gridScrollRef">
-                  <t-card class="scene-card" hover-shadow v-for="point in pagedRoomPoints" :key="point.id">
-                <template #cover>
-                  <t-image-viewer v-if="sceneCovers[point.id]" :images="[sceneCovers[point.id]]">
-                    <template #trigger="{ open }">
-                      <div class="card-cover clickable" @click="open">
-                        <img :src="sceneCovers[point.id]" alt="cover" class="cover-img" loading="lazy" />
+            <div class="points-scroll-layer">
+              <template v-if="filteredPoints.length > 0">
+                <template v-if="viewMode === 'grid'">
+                  <div class="scene-grid" ref="gridScrollRef">
+                    <t-card class="scene-card" hover-shadow v-for="point in pagedRoomPoints" :key="point.id">
+                      <template #cover>
+                        <t-image-viewer v-if="sceneCovers[point.id]" :images="[sceneCovers[point.id]]">
+                          <template #trigger="{ open }">
+                            <div class="card-cover clickable" @click="open">
+                              <img :src="sceneCovers[point.id]" alt="cover" class="cover-img" loading="lazy" />
+                            </div>
+                          </template>
+                        </t-image-viewer>
+                        <div v-else class="card-cover">
+                          <div class="cover-placeholder">
+                            <ImageIcon size="32" />
+                            <span>暂无对照图</span>
+                          </div>
+                        </div>
+                      </template>
+
+                      <div class="scene-info">
+                        <div class="scene-select" v-if="multiSelectMode">
+                          <t-checkbox
+                            :checked="isPointSelected(point.id)"
+                            @change="(checked) => togglePointSelection(point.id, checked)"
+                          />
+                        </div>
+                        <div class="scene-text">
+                          <h3>{{ point.name || point.id }}</h3>
+                          <p class="scene-id">点位ID: {{ point.id }}</p>
+                          <p class="scene-room" v-if="searchScope === 'all'">房间: {{ point.roomName || point.roomId }}</p>
+                        </div>
+                        <div class="scene-actions">
+                          <t-button size="small" variant="outline" @click="triggerUpload(point)">
+                            {{ sceneCovers[point.id] ? '更新对照图' : '上传对照图' }}
+                          </t-button>
+                        </div>
                       </div>
-                    </template>
-                  </t-image-viewer>
-                  <div v-else class="card-cover">
-                    <div class="cover-placeholder">
-                      <ImageIcon size="32" />
-                      <span>暂无对照图</span>
-                    </div>
+                    </t-card>
                   </div>
                 </template>
 
-                  <div class="scene-info">
-                    <div class="scene-select" v-if="multiSelectMode">
-                      <t-checkbox
-                        :checked="isPointSelected(point.id)"
-                        @change="(checked) => togglePointSelection(point.id, checked)"
-                      />
-                    </div>
-                    <div class="scene-text">
-                      <h3>{{ point.name || point.id }}</h3>
-                      <p class="scene-id">点位ID: {{ point.id }}</p>
-                      <p class="scene-room" v-if="searchScope === 'all'">房间: {{ point.roomName || point.roomId }}</p>
-                    </div>
-                    <div class="scene-actions">
-                      <t-button size="small" variant="outline" @click="triggerUpload(point)">
-                        {{ sceneCovers[point.id] ? '更新对照图' : '上传对照图' }}
-                      </t-button>
-                    </div>
-                  </div>
-                </t-card>
-              </div>
-              <div class="points-pagination" v-if="showGridPagination">
-                <t-pagination
-                  :total="filteredPoints.length"
-                  v-model:current="gridCurrentPage"
-                  v-model:pageSize="gridPageSize"
-                  :pageSizeOptions="[24, 48, 96]"
-                  :showJumper="true"
-                  :showPageSize="true"
-                  @change="handleGridPageChange"
-                />
-              </div>
-            </template>
-
-              <t-list
-                v-else
-                ref="listScrollRef"
-                class="point-list"
-                split
-              >
-                <t-list-item v-for="point in filteredPoints" :key="point.id">
-                  <div class="point-row">
-                    <div class="point-select" v-if="multiSelectMode">
-                      <t-checkbox
-                        :checked="isPointSelected(point.id)"
-                        @change="(checked) => togglePointSelection(point.id, checked)"
-                      />
-                    </div>
-                    <div class="point-thumb">
-                      <t-image-viewer v-if="sceneCovers[point.id]" :images="[sceneCovers[point.id]]">
-                        <template #trigger="{ open }">
-                          <div class="point-thumb-box clickable" @click="open">
-                            <img :src="sceneCovers[point.id]" alt="cover" class="cover-img" loading="lazy" />
+                <t-list
+                  v-else
+                  ref="listScrollRef"
+                  class="point-list"
+                  split
+                >
+                  <t-list-item v-for="point in filteredPoints" :key="point.id">
+                    <div class="point-row">
+                      <div class="point-select" v-if="multiSelectMode">
+                        <t-checkbox
+                          :checked="isPointSelected(point.id)"
+                          @change="(checked) => togglePointSelection(point.id, checked)"
+                        />
+                      </div>
+                      <div class="point-thumb">
+                        <t-image-viewer v-if="sceneCovers[point.id]" :images="[sceneCovers[point.id]]">
+                          <template #trigger="{ open }">
+                            <div class="point-thumb-box clickable" @click="open">
+                              <img :src="sceneCovers[point.id]" alt="cover" class="cover-img" loading="lazy" />
+                            </div>
+                          </template>
+                        </t-image-viewer>
+                        <div v-else class="point-thumb-box">
+                          <div class="cover-placeholder small">
+                            <ImageIcon size="20" />
+                            <span>无图</span>
                           </div>
-                        </template>
-                      </t-image-viewer>
-                      <div v-else class="point-thumb-box">
-                        <div class="cover-placeholder small">
-                          <ImageIcon size="20" />
-                          <span>无图</span>
                         </div>
                       </div>
-                    </div>
 
-                    <div class="point-main">
-                      <div class="point-title">{{ point.name || point.id }}</div>
-                      <div class="point-id">点位ID: {{ point.id }}</div>
-                      <div class="point-room" v-if="searchScope === 'all'">房间: {{ point.roomName || point.roomId }}</div>
-                    </div>
+                      <div class="point-main">
+                        <div class="point-title">{{ point.name || point.id }}</div>
+                        <div class="point-id">点位ID: {{ point.id }}</div>
+                        <div class="point-room" v-if="searchScope === 'all'">房间: {{ point.roomName || point.roomId }}</div>
+                      </div>
 
-                    <div class="point-actions">
-                      <t-button size="small" variant="outline" @click="triggerUpload(point)">
-                        {{ sceneCovers[point.id] ? '更新对照图' : '上传对照图' }}
-                      </t-button>
+                      <div class="point-actions">
+                        <t-button size="small" variant="outline" @click="triggerUpload(point)">
+                          {{ sceneCovers[point.id] ? '更新对照图' : '上传对照图' }}
+                        </t-button>
+                      </div>
                     </div>
-                  </div>
-                </t-list-item>
-              </t-list>
-            </template>
+                  </t-list-item>
+                </t-list>
+              </template>
 
-            <div v-else class="empty-state">
-              <t-empty :description="emptyDescription" />
+              <div v-else class="empty-state">
+                <t-empty :description="emptyDescription" />
+              </div>
+
+              <t-button
+                v-if="showBackToTop"
+                class="back-top-btn"
+                shape="circle"
+                size="large"
+                theme="primary"
+                @click="scrollToTop"
+              >
+                <template #icon><BacktopIcon /></template>
+              </t-button>
+            </div>
+            <div class="points-pagination" v-if="viewMode === 'grid' && showGridPagination">
+              <t-pagination
+                :total="filteredPoints.length"
+                v-model:current="gridCurrentPage"
+                v-model:pageSize="gridPageSize"
+                :pageSizeOptions="[24, 48, 96]"
+                :showJumper="true"
+                :showPageSize="true"
+                @change="handleGridPageChange"
+              />
             </div>
           </div>
         </t-loading>
-        <t-button
-          v-if="showBackToTop"
-          class="back-top-btn"
-          shape="circle"
-          size="large"
-          theme="primary"
-          :style="backTopStyle"
-          @click="scrollToTop"
-        >
-          <template #icon><BacktopIcon /></template>
-        </t-button>
       </section>
     </div>
 
@@ -278,32 +261,6 @@
     </t-dialog>
 
     <t-dialog
-      v-model:visible="padDialogVisible"
-      header="房间 Pad 绑定"
-      width="560px"
-      :close-on-overlay-click="false"
-      :close-btn="!bindingPad"
-    >
-      <div class="create-point-body">
-        <t-select v-model="padForm.roomId" placeholder="请选择房间">
-          <t-option v-for="room in roomsTree" :key="room.id" :label="room.name || room.id" :value="String(room.id)" />
-        </t-select>
-        <t-input v-model="padForm.padId" placeholder="Pad ID（必填）" />
-        <t-input
-          v-model="padForm.padKey"
-          type="password"
-          placeholder="Pad Key（必填，提交后仅保存哈希）"
-        />
-      </div>
-      <template #footer>
-        <t-space>
-          <t-button variant="outline" :disabled="bindingPad" @click="closePadBindingDialog">取消</t-button>
-          <t-button theme="primary" :loading="bindingPad" @click="executeBindPad">确认绑定</t-button>
-        </t-space>
-      </template>
-    </t-dialog>
-
-    <t-dialog
       v-model:visible="importDialogVisible"
       header="配置导入中心"
       width="760px"
@@ -341,7 +298,7 @@
         </div>
 
         <div class="import-tip">
-          模板字段：rooms[].id/name/model_path/points[].id/name
+          模板字段：rooms[].id/name/description/status/padId(可选)/points[].id/name/code/location
         </div>
       </div>
 
@@ -391,6 +348,7 @@ import { useStore } from 'vuex';
 import { UploadIcon, ImageIcon, DownloadIcon, RefreshIcon, BacktopIcon } from 'tdesign-icons-vue-next';
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next';
 import { apiBaseUrl } from '../services/apiClient';
+import RoomListPanel from './RoomListPanel.vue';
 
 const TEMPLATE = {
   rooms: [
@@ -398,7 +356,7 @@ const TEMPLATE = {
       id: 'room1',
       name: 'Room 1',
       description: '示例房间',
-      model_path: 'models/room1_model.pt',
+      padId: 'PAD-001',
       status: 'enabled',
       points: [
         { id: 'point1', name: 'Point 1', code: 'P1', location: 'A-1' },
@@ -416,13 +374,12 @@ const normalizeImportPayload = (raw) => {
   const rooms = raw.rooms.map((room, roomIndex) => {
     const id = String(room?.id || '').trim();
     const name = String(room?.name || '').trim();
-    const modelPath = String(room?.model_path || room?.modelPath || '').trim();
     const status = String(room?.status || 'enabled').trim();
     const description = String(room?.description || '').trim();
+    const padId = String(room?.padId || room?.pad_id || '').trim();
 
     if (!id) throw new Error(`第 ${roomIndex + 1} 个房间缺少 id`);
     if (!name) throw new Error(`房间 ${id} 缺少 name`);
-    if (!modelPath) throw new Error(`房间 ${id} 缺少 model_path`);
 
     const rawPoints = Array.isArray(room?.points) ? room.points : [];
     const points = rawPoints.map((point, pointIndex) => {
@@ -438,14 +395,16 @@ const normalizeImportPayload = (raw) => {
       };
     });
 
-    return {
+    const normalizedRoom = {
       id,
       name,
       description,
-      model_path: modelPath,
       status,
       points
     };
+
+    if (padId) normalizedRoom.padId = padId;
+    return normalizedRoom;
   });
 
   return { rooms };
@@ -454,6 +413,7 @@ const normalizeImportPayload = (raw) => {
 export default {
   name: 'ScenePreview',
   components: {
+    RoomListPanel,
     UploadIcon,
     ImageIcon,
     DownloadIcon,
@@ -473,10 +433,8 @@ export default {
     const importPayload = ref(null);
     const importSummary = reactive({ roomCount: 0, pointCount: 0 });
     const creating = ref(false);
-    const bindingPad = ref(false);
     const deleting = ref(false);
     const createDialogVisible = ref(false);
-    const padDialogVisible = ref(false);
     const bulkDeleteDialogVisible = ref(false);
     const multiSelectMode = ref(false);
     const selectedPointIds = ref([]);
@@ -485,11 +443,6 @@ export default {
       name: '',
       code: '',
       location: ''
-    });
-    const padForm = reactive({
-      roomId: '',
-      padId: '',
-      padKey: ''
     });
 
     const sceneCovers = reactive({});
@@ -520,19 +473,6 @@ export default {
     const currentRoomName = computed(() => {
       const room = roomsTree.value.find((item) => String(item.id || '') === String(selectedRoomId.value));
       return room ? (room.name || room.id) : '未选择房间';
-    });
-    const selectedRoom = computed(() => {
-      return roomsTree.value.find((item) => String(item.id || '') === String(selectedRoomId.value)) || null;
-    });
-    const roomPadHint = computed(() => {
-      if (searchScope.value === 'all') return '';
-      if (!selectedRoom.value) return '';
-      const padId = String(selectedRoom.value.padId || '').trim();
-      const lastSeen = selectedRoom.value.padLastSeenAt ? new Date(selectedRoom.value.padLastSeenAt) : null;
-      const lastSeenText = lastSeen && !Number.isNaN(lastSeen.getTime())
-        ? `，最后在线：${lastSeen.toLocaleString()}`
-        : '';
-      return padId ? `Pad: ${padId}${lastSeenText}` : 'Pad: 未绑定';
     });
     const menuActiveRoomId = computed(() => {
       return searchScope.value === 'all' ? '' : selectedRoomId.value;
@@ -571,9 +511,6 @@ export default {
     const showGridPagination = computed(() => {
       return viewMode.value === 'grid' && filteredPoints.value.length > gridPageSize.value;
     });
-    const backTopStyle = computed(() => ({
-      bottom: showGridPagination.value ? '112px' : '20px'
-    }));
     const selectedCount = computed(() => selectedPointIds.value.length);
     const selectedPointIdSet = computed(() => new Set(selectedPointIds.value));
     const selectedPoints = computed(() => {
@@ -735,12 +672,6 @@ export default {
       await nextTick();
       bindActiveScrollListener();
     });
-    watch(() => padForm.roomId, (rid) => {
-      if (!padDialogVisible.value) return;
-      const room = roomsTree.value.find((item) => String(item.id || '') === String(rid || ''));
-      padForm.padId = String(room?.padId || '');
-      padForm.padKey = '';
-    });
 
     const handleRoomChange = (value) => {
       if (searchScope.value === 'all') {
@@ -845,59 +776,6 @@ export default {
       createForm.name = '';
       createForm.code = '';
       createForm.location = '';
-    };
-
-    const resetPadForm = () => {
-      const currentRoom = String(selectedRoomId.value || '');
-      const targetRoomId = currentRoom || firstRoomId.value;
-      const targetRoom = roomsTree.value.find((room) => String(room.id || '') === targetRoomId);
-      padForm.roomId = targetRoomId;
-      padForm.padId = String(targetRoom?.padId || '');
-      padForm.padKey = '';
-    };
-
-    const openPadBindingDialog = () => {
-      if (!selectedRoomId.value && roomsTree.value.length > 0) {
-        selectedRoomId.value = String(roomsTree.value[0].id || '');
-      }
-      resetPadForm();
-      padDialogVisible.value = true;
-    };
-
-    const closePadBindingDialog = () => {
-      padDialogVisible.value = false;
-      resetPadForm();
-    };
-
-    const executeBindPad = async () => {
-      const roomId = String(padForm.roomId || '').trim();
-      const padId = String(padForm.padId || '').trim();
-      const padKey = String(padForm.padKey || '').trim();
-      if (!roomId) {
-        MessagePlugin.error('请选择房间');
-        return;
-      }
-      if (!padId || !padKey) {
-        MessagePlugin.error('padId 与 padKey 不能为空');
-        return;
-      }
-
-      bindingPad.value = true;
-      const loadingMsg = MessagePlugin.loading({ content: '正在更新房间 Pad 绑定...', duration: 0 });
-      try {
-        const res = await store.dispatch('updateRoomPadBinding', { roomId, padId, padKey });
-        if (!res.success) {
-          MessagePlugin.error(res.message || '更新 Pad 绑定失败');
-          return;
-        }
-        MessagePlugin.success('Pad 绑定更新成功');
-        selectedRoomId.value = roomId;
-        closePadBindingDialog();
-        await fetchScenes();
-      } finally {
-        bindingPad.value = false;
-        MessagePlugin.close(loadingMsg);
-      }
     };
 
     const openCreateDialog = () => {
@@ -1109,14 +987,12 @@ export default {
       roomsTree,
       currentRoomPoints,
       currentRoomName,
-      roomPadHint,
       basePoints,
       filteredPoints,
       pointsHeaderTitle,
       emptyDescription,
       pagedRoomPoints,
       showGridPagination,
-      backTopStyle,
       menuActiveRoomId,
       selectedRoomId,
       viewMode,
@@ -1130,7 +1006,6 @@ export default {
       loading,
       importing,
       creating,
-      bindingPad,
       deleting,
       sceneCovers,
       fileInputRef,
@@ -1138,10 +1013,8 @@ export default {
       listScrollRef,
 
       createDialogVisible,
-      padDialogVisible,
       bulkDeleteDialogVisible,
       createForm,
-      padForm,
       importDialogVisible,
       confirmDialogVisible,
       confirmKeyword,
@@ -1164,9 +1037,6 @@ export default {
       openCreateDialog,
       closeCreateDialog,
       executeCreatePoint,
-      openPadBindingDialog,
-      closePadBindingDialog,
-      executeBindPad,
       openBulkDeleteDialog,
       closeBulkDeleteDialog,
       executeBulkDelete,
@@ -1228,118 +1098,6 @@ export default {
   align-items: stretch;
 }
 
-.rooms-panel {
-  width: auto;
-  min-width: 0;
-  max-width: 340px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
-  background: var(--td-bg-color-container);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.rooms-title {
-  padding: 14px 16px;
-  font-size: 14px;
-  font-weight: 700;
-  border-bottom: 1px solid var(--td-component-stroke);
-  color: var(--td-text-color-primary);
-}
-
-.rooms-menu {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 0;
-}
-
-.rooms-menu::-webkit-scrollbar {
-  width: 6px;
-}
-
-.rooms-menu::-webkit-scrollbar-thumb {
-  background: var(--td-component-border);
-  border-radius: 999px;
-}
-
-.rooms-menu:deep(.t-default-menu),
-.rooms-menu:deep(.t-menu) {
-  width: 100% !important;
-  max-width: 100% !important;
-  display: block;
-  background: transparent;
-}
-
-.rooms-menu :deep(.t-menu__item) {
-  min-height: 44px;
-  margin: 2px 10px;
-  padding: 0 14px;
-  border-radius: 8px;
-  color: var(--td-text-color-secondary);
-  transition: all 0.2s ease;
-}
-
-.rooms-menu :deep(.t-menu__item .t-menu__content) {
-  font-weight: 500;
-  font-size: 15px;
-}
-
-.room-item {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.room-item-name {
-  line-height: 20px;
-}
-
-.room-item-pad {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-  line-height: 16px;
-}
-
-.rooms-menu :deep(.t-menu__item:hover:not(.t-is-active):not(.t-is-opened):not(.t-is-disabled)) {
-  background-color: var(--td-bg-color-container-hover);
-}
-
-.rooms-menu :deep(.t-menu__item.t-is-active:not(.t-is-opened)) {
-  position: relative;
-  color: var(--td-brand-color);
-  background-color: var(--td-brand-color-light);
-}
-
-.rooms-menu :deep(.t-menu__item.t-is-active:not(.t-is-opened)::before) {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 999px;
-  background-color: var(--td-brand-color);
-}
-
-.rooms-menu :deep(.t-menu__item.t-is-active:not(.t-is-opened) .t-menu__content) {
-  padding-left: 10px;
-  font-weight: 600;
-}
-
-.rooms-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-}
-
 .points-panel {
   position: relative;
   flex: 1;
@@ -1368,12 +1126,6 @@ export default {
 .points-header .title {
   font-size: 14px;
   font-weight: 600;
-}
-
-.pad-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
 }
 
 .points-header .meta {
@@ -1432,8 +1184,18 @@ export default {
   overflow: hidden;
 }
 
+.points-scroll-layer {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .scene-grid {
   flex: 1;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
   padding: 14px;
@@ -1528,6 +1290,7 @@ export default {
 
 .point-list {
   flex: 1;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
 }
@@ -1613,6 +1376,7 @@ export default {
 .back-top-btn {
   position: absolute;
   right: 16px;
+  bottom: 16px;
   z-index: 5;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -1702,13 +1466,6 @@ export default {
     flex-direction: column;
   }
 
-  .rooms-panel {
-    max-width: none;
-    width: 100%;
-    max-height: min(30vh, 240px);
-    overflow: hidden;
-  }
-
   .scene-grid {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
@@ -1717,10 +1474,6 @@ export default {
 @media (max-height: 780px) {
   .scene-preview-container {
     padding: 12px;
-  }
-
-  .rooms-panel {
-    max-height: min(28vh, 200px);
   }
 }
 </style>

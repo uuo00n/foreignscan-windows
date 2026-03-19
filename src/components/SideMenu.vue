@@ -19,6 +19,12 @@
         </template>
         点位列表
       </t-menu-item>
+      <t-menu-item value="pad-binding">
+        <template #icon>
+          <SettingIcon />
+        </template>
+        Pad绑定
+      </t-menu-item>
       <t-menu-item value="date-list">
         <template #icon>
           <CalendarIcon />
@@ -32,14 +38,15 @@
 <script>
 import { computed } from 'vue';
 import { useStore } from 'vuex';
-import { DashboardIcon, AppIcon, CalendarIcon } from 'tdesign-icons-vue-next';
+import { DashboardIcon, AppIcon, CalendarIcon, SettingIcon } from 'tdesign-icons-vue-next';
 
 export default {
   name: 'SideMenu',
   components: {
     DashboardIcon,
     AppIcon,
-    CalendarIcon
+    CalendarIcon,
+    SettingIcon
   },
   props: {
     value: {
